@@ -3,8 +3,8 @@
 
 FlightData::FlightData()
 {
-   attitude_sub = fnh.subscribe("dji_sdk/attitude", 10, &FlightData::attitude_callback, this);
-   gps_sub = fnh.subscribe("dji_sdk/gps_position", 10, &FlightData::gps_callback, this);
+   //attitude_sub = fnh.subscribe("dji_sdk/attitude", 10, &FlightData::attitude_callback, this);
+  // gps_sub = fnh.subscribe("dji_sdk/gps_position", 10, &FlightData::gps_callback, this);
    flightStatus_sub = fnh.subscribe("dji_sdk/flight_status", 10, &FlightData::flight_status_callback, this);
    gpsHealth_sub =fnh.subscribe("dji_sdk/gps_health", 10, &FlightData::gps_health_callback, this);
    imu_sub = fnh.subscribe("dji_sdk/imu", 10, &FlightData::imu_callback, this);
@@ -14,12 +14,12 @@ FlightData::FlightData()
    velocity_sub = fnh.subscribe("/dji_sdk/velocity", 10,  &FlightData::velocity_callback, this);
 }
 
-void FlightData::attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg)
-{
-  attitude_data = msg->quaternion;
-  ROS_INFO_ONCE("Quaternion Data %f, %f, %f, %f", attitude_data.x, attitude_data.y, attitude_data.z, attitude_data.w);
+// void FlightData::attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg)
+// {
+//   attitude_data = msg->quaternion;
+//   ROS_INFO_ONCE("Quaternion Data %f, %f, %f, %f", attitude_data.x, attitude_data.y, attitude_data.z, attitude_data.w);
     
-}
+// }
 
 sensor_msgs::NavSatFix FlightData::GetGPSPosition()
 {
@@ -71,16 +71,16 @@ void FlightData::batteryState_callback(const sensor_msgs::BatteryState::ConstPtr
  // mobileCommManager.SendDataToMobile(battery_data_to_mobile);
 }
 
-void FlightData::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
-{
-  current_gps_location.latitude = msg->latitude;
-  current_gps_location.longitude = msg->longitude;
-  current_gps_location.altitude = msg->altitude;
+// void FlightData::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
+// {
+//   current_gps_location.latitude = msg->latitude;
+//   current_gps_location.longitude = msg->longitude;
+//   current_gps_location.altitude = msg->altitude;
   
 
-  ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
+//   ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
 
-}
+// }
 
 void FlightData::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
 {

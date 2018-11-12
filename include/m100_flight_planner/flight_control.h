@@ -12,6 +12,10 @@
 #include <dji_sdk/QueryDroneVersion.h>
 #include <dji_sdk/SetLocalPosRef.h>
 #include <dji_sdk/Activation.h>
+
+
+#include "m100_flight_planner/mobile_comm.h"
+
 //DJI SDK DRONE LIBRARY
 #include <djiosdk/dji_vehicle.hpp>
 #include "dji_sdk/dji_sdk.h"
@@ -67,6 +71,7 @@ class FlightControl
     ros::ServiceClient query_version_service;
     ros::ServiceClient drone_activation_service;
     ros::ServiceClient set_local_pos_reference;
+    ros::ServiceClient mobile_data_service;
     ros::Subscriber gps_sub;
 
 

@@ -59,11 +59,7 @@ class FlightData
   // accessor to return GPS Position
   sensor_msgs::NavSatFix GetGPSPosition();
      // Callbacks to return flight data
-    //return attitude data
-  void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
-  // returg GPS data
-  void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
- // Return GPS Health data
+  
   void gps_health_callback(const std_msgs::UInt8::ConstPtr& msg);
 // Return IMU data
   void imu_callback(const sensor_msgs::Imu::ConstPtr& msg);

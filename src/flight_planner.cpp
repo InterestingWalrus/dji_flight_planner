@@ -1,15 +1,17 @@
 #include "m100_flight_planner/flight_planner.h"
 
-
 FlightPlanner::FlightPlanner()
 {
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
+    gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+    local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
+    attitude_sub = nh.subscribe("/dji_sdk/attitude", 10, &FlightPlanner::attitude_callback, this);
+    mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
     FlightControl flightControl;
 
     obtain_control = flightControl.obtainControl();
-    bool takeoff_result;
-
+   
     if(obtain_control == true)
     {
         if(flightControl.set_local_position())
@@ -21,44 +23,125 @@ FlightPlanner::FlightPlanner()
     state = MissionState::IDLE;
     waypoint_finished = false;
 
-    if(flightControl.check_M100())
-    {
-        ROS_INFO("M100 Drone taking off");
-        takeoff_result = flightControl.M100monitoredTakeoff();
-
-    }
-    else
-    {
-
-        // Drone is an A3/N3 variant
-        ROS_INFO("Custom Drone taking off");
-        takeoff_result = flightControl.monitoredTakeoff();
-
-    }
-
-    if(takeoff_result)
-    {
-        reset(current_gps_location, current_local_position);
-
-        ROS_INFO("Initiating mission");
-
-        while(ros::ok())
-        {
-            ros::spinOnce();
-            runMission();
-        }
-
-    }
-
-    else
-    {
-        ROS_INFO("Drone failed to take off");
-    }
-
-
-
+        
     
-    
+}
+
+void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data)
+{
+
+    data_from_mobile = *mobile_data;
+    unsigned char data;
+    memcpy(&data, &data_from_mobile.data[0], 10);
+
+    unsigned char flight_data[20] = {0};
+
+    ROS_INFO_STREAM ("Receieved from mobile: " <<std::hex << data_from_mobile );
+
+    unsigned char CMD = data_from_mobile.data[0];
+
+    double latitude;
+    double longitude;
+    float altitude;
+
+    switch(CMD)
+    {
+       case 0x01:
+       {
+           ROS_INFO("Waypoints received");
+
+           for(int i = 0; i < sizeof(latitude_array); i ++)
+            {
+                 latitude_array [i] = data_from_mobile.data[i + 1];  
+          
+            }
+
+            for(int i = 0; i < sizeof(longitude_array); i ++)
+            {
+                longitude_array [i] = data_from_mobile.data[i + 9] ;
+            }   
+
+            for(int i = 0; i < sizeof(altitude_array); i ++)
+            {
+                altitude_array [i] = data_from_mobile.data[i + 17] ;
+            }
+   
+
+
+            std::reverse(std::begin(latitude_array), std::end(latitude_array));
+            std::reverse(std::begin(longitude_array), std::end(longitude_array));
+            std::reverse(std::begin(altitude_array), std::end(altitude_array));
+
+            std::memcpy(&latitude, latitude_array, sizeof (double));
+            std::memcpy(&longitude, longitude_array, sizeof (double));
+            std::memcpy(&altitude, altitude_array, sizeof(float));
+
+
+            prepareFlightPlan(latitude, longitude, altitude);
+
+
+           break;
+
+
+       }
+
+       case 0x1A:
+       {
+           // Clear all points. Use onMissionFinished for now
+           onMissionFinished();
+
+           ROS_INFO ("Waypoints cleared");
+           break;
+       }
+
+       case 0x2A:
+       {
+           // run mission.
+           if(flightControl.check_M100())
+            {
+                ROS_INFO("M100 Drone taking off");
+                takeoff_result = flightControl.M100monitoredTakeoff();
+
+            }
+            else
+            {
+
+                // Drone is an A3/N3 variant
+                ROS_INFO("Custom Drone taking off");
+                takeoff_result = flightControl.monitoredTakeoff();
+
+            }
+
+            if(takeoff_result)
+            {
+                reset(current_gps_location, current_local_position);
+
+                ROS_INFO("Initiating mission");
+
+                while(ros::ok())
+                {
+                    ros::spinOnce();
+                    runMission();
+                }
+
+            }
+
+            else
+            {
+                ROS_INFO("Drone failed to take off");
+            }
+
+            }
+
+
+            default:
+            {
+                    break;
+            }
+        
+
+    }
+
 }
 
 FlightPlanner::~FlightPlanner()
@@ -185,12 +268,12 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
 }
 
 
-void FlightPlanner::prepareFlightPlan()
+void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt)
 {
     sensor_msgs::NavSatFix flightWaypoint;
-    flightWaypoint.latitude = 
-    flightWaypoint.longitude = 
-    flightWaypoint.altitude = 
+    flightWaypoint.latitude = lat;
+    flightWaypoint.longitude = lon;
+    flightWaypoint.altitude =  alt;
 
 
     appendFlightPlan(flightWaypoint);
@@ -456,6 +539,27 @@ void FlightPlanner::runMission()
 }
 
 
+void FlightPlanner::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
+{
+  current_gps_location = *msg;
+  
+
+  ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
+
+}
+
+
+void FlightPlanner::local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg)
+{
+    current_local_position = msg->point;
+
+}
+
+void FlightPlanner::attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg)
+{
+    current_drone_attitude = msg->quaternion;
+}
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "Flight Control");
@@ -466,13 +570,4 @@ int main(int argc, char** argv)
     ros::spin();
 
     return 0;
-}
-
-void FlightPlanner::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
-{
-  current_gps_location = *msg;
-  
-
-  ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
-
 }

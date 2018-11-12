@@ -21,6 +21,7 @@
 
 #include "m100_flight_planner/flight_state.h"
 #include "m100_flight_planner/flight_control.h"
+#include "m100_flight_planner/mobile_comm.h"
 
 #define PI (double) 3.141592653589793
 #define C_EARTH (double)6378137.0
@@ -64,11 +65,20 @@ class FlightPlanner
         void onWaypointReached();
         void onMissionFinished();
         void runMission();
-        void prepareFlightPlan();
+        void prepareFlightPlan(double lat, double lon, double alt);
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint);
         void localOffsetFromGpsOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
         geometry_msgs::Vector3 toEulerAngle(geometry_msgs::Quaternion quat);
+
+
+        void MobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& from_mobile_data);
+        void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
+        void local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg);
+        void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
+        void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
+
+
     
    
     private:
@@ -79,6 +89,9 @@ class FlightPlanner
     int outbound_counter;
     int inbound_counter;
     int break_counter;
+
+    dji_sdk::MobileData data_from_mobile;
+    unsigned char data_to_mobile[10];
 
     float target_offset_x;
     float target_offset_y;
@@ -95,6 +108,11 @@ class FlightPlanner
 
     bool waypoint_finished;
     bool obtain_control;
+    bool takeoff_result;
+
+    unsigned char latitude_array[8] = {0};
+    unsigned char longitude_array[8] = {0};
+    unsigned char altitude_array[4] = {0};
 
     // Use this control flag (x-y ground frame is horizontal frame in ENU)
     uint8_t control_flag = (DJISDK::VERTICAL_VELOCITY| DJISDK::HORIZONTAL_VELOCITY|DJISDK::YAW_RATE |DJISDK::HORIZONTAL_GROUND |DJISDK::STABLE_ENABLE); 
@@ -108,10 +126,17 @@ class FlightPlanner
     uint8_t control_flag_yaw_angle_enu = (DJISDK::VERTICAL_VELOCITY| DJISDK::HORIZONTAL_VELOCITY|DJISDK::YAW_ANGLE |DJISDK::HORIZONTAL_GROUND |DJISDK::STABLE_ENABLE);
 
 
-    DroneState droneState;
+ 
+    MobileComm mobileCommManager;
     FlightControl flightControl;
     ros::NodeHandle nh;
     ros::Publisher control_pub;
+
+    ros::Subscriber attitude_sub;
+    ros::Subscriber gps_sub;
+    ros::Subscriber local_position_sub;
+    ros::Subscriber mobile_data_subscriber;
+
     
 
 
