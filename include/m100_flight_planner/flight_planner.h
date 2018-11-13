@@ -22,19 +22,20 @@
 #include "m100_flight_planner/flight_state.h"
 #include "m100_flight_planner/flight_control.h"
 #include "m100_flight_planner/mobile_comm.h"
+#include "m100_flight_planner/PID.h"
 
 #define PI (double) 3.141592653589793
 #define C_EARTH (double)6378137.0
 
-static double Deg_To_Rad( double degree)
-{
-    return degree * (PI/180.0);
-};
+// static double Deg_To_Rad( double degree)
+// {
+//     return degree * (PI/180.0);
+// };
 
-static double Rad_To_Deg(double rad)
-{
-  return rad * (180.0/PI);  
-};
+// static double Rad_To_Deg(double rad)
+// {
+//   return rad * (180.0/PI);  
+// };
 
 enum MissionState
 {
@@ -69,6 +70,7 @@ class FlightPlanner
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint);
         void localOffsetFromGpsOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
+        void droneControlSignalPID(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
         geometry_msgs::Vector3 toEulerAngle(geometry_msgs::Quaternion quat);
 
 
@@ -129,6 +131,7 @@ class FlightPlanner
  
     MobileComm mobileCommManager;
     FlightControl flightControl;
+    PID pid;  
     ros::NodeHandle nh;
     ros::Publisher control_pub;
 

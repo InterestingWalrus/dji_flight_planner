@@ -9,6 +9,7 @@ FlightPlanner::FlightPlanner()
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
     FlightControl flightControl;
+    PID pid;
 
     obtain_control = flightControl.obtainControl();
    
@@ -300,6 +301,45 @@ void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt)
 void FlightPlanner::droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate, bool use_ground_frame)
 {
     sensor_msgs::Joy controlPosYaw;
+
+    controlPosYaw.axes.push_back(x);
+    controlPosYaw.axes.push_back(y);
+    controlPosYaw.axes.push_back(z);
+    controlPosYaw.axes.push_back(yaw);
+
+    if(use_yaw_rate && use_ground_frame) // using yaw rate and ground frame
+    {
+        controlPosYaw.axes.push_back(control_flag); 
+    }
+
+    else if (use_yaw_rate) // using yaw rate and body frame
+    {
+         controlPosYaw.axes.push_back(control_flag_fru); 
+    }
+
+    else if (use_ground_frame) // using yaw angle and ground frame
+    {
+         controlPosYaw.axes.push_back(control_flag_yaw_angle_enu); 
+    }
+
+    else // using yaw angle and UAV Body frame
+    {
+         controlPosYaw.axes.push_back(control_flag_yaw_angle_fru); 
+    }
+
+    control_pub.publish(controlPosYaw);
+
+}
+
+
+void FlightPlanner::droneControlSignalPID(double x, double y, double z, double yaw, bool use_yaw_rate , bool use_ground_frame )
+{
+
+    sensor_msgs::Joy controlPosYaw;
+
+    x = pid.calculate(target_offset_x, current_local_position.x, 0.1, 30 );
+    y = pid.calculate(target_offset_y, current_local_position.y, 0.01, 30 );
+    z = pid.calculate(target_offset_z, current_local_position.z, -0.01, 5 );
 
     controlPosYaw.axes.push_back(x);
     controlPosYaw.axes.push_back(y);

@@ -12,7 +12,6 @@ FlightControl::FlightControl()
     
 }
 
-
 void FlightControl::flight_status_callback(const std_msgs::UInt8::ConstPtr& msg)
 {
   flight_status = msg->data;
