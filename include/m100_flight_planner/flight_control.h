@@ -73,6 +73,8 @@ class FlightControl
     ros::ServiceClient set_local_pos_reference;
     ros::ServiceClient mobile_data_service;
     ros::Subscriber gps_sub;
+    ros::Subscriber gps_health_sub;
+     ros::Subscriber flightStatusSub;
 
 
     uint8_t flight_status = 255;

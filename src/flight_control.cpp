@@ -9,6 +9,12 @@ FlightControl::FlightControl()
    query_version_service      = nh.serviceClient<dji_sdk::QueryDroneVersion>("dji_sdk/query_drone_version");
    drone_activation_service = nh.serviceClient<dji_sdk::Activation>("dji_sdk/activation");
    set_local_pos_reference    = nh.serviceClient<dji_sdk::SetLocalPosRef> ("dji_sdk/set_local_pos_ref");
+   
+
+   gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
+   gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
+   flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
+
     
 }
 
@@ -27,6 +33,7 @@ void FlightControl::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
   current_gps.latitude = msg->latitude;
   current_gps.longitude = msg->longitude;
   current_gps.altitude = msg->altitude;
+  //ROS_INFO ("GPS:  %f , %f, %f,", current_gps.latitude, current_gps.longitude, current_gps.altitude);
 }
  
 void FlightControl::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
@@ -336,9 +343,13 @@ bool FlightControl::M100monitoredTakeoff()
     ros::spinOnce();
   }
 
+  
+
   if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR ||
       current_gps.altitude - home_altitude < 1.0)
   {
+    ROS_INFO("Home Alt: %f",  home_altitude);
+    ROS_INFO("Current Alt: %f", current_gps.altitude);
     ROS_ERROR("Takeoff failed.");
     return false;
   }

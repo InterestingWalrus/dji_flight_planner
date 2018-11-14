@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>m100_flight_planner</name>
+  <name>dji_flight_planner</name>
   <version>0.0.0</version>
   <description>The m100_flight_planner package</description>
 

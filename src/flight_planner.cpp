@@ -11,6 +11,8 @@ FlightPlanner::FlightPlanner()
     FlightControl flightControl;
     PID pid;
 
+    ROS_INFO("In loop");
+
     obtain_control = flightControl.obtainControl();
    
     if(obtain_control == true)
@@ -23,7 +25,111 @@ FlightPlanner::FlightPlanner()
 
     state = MissionState::IDLE;
     waypoint_finished = false;
+    waypoint_index = 0;
+    waypoint_count = 0;
+    inbound_counter = 0;
+    outbound_counter = 0;
+    break_counter = 0;
 
+    sensor_msgs::NavSatFix waypoint1;
+    sensor_msgs::NavSatFix waypoint2;
+    sensor_msgs::NavSatFix waypoint3;
+    sensor_msgs::NavSatFix waypoint4;
+    sensor_msgs::NavSatFix waypoint5;
+    sensor_msgs::NavSatFix waypoint6;
+    sensor_msgs::NavSatFix waypoint7;
+    sensor_msgs::NavSatFix waypoint8;
+    sensor_msgs::NavSatFix waypoint9;
+    sensor_msgs::NavSatFix waypoint10;
+    sensor_msgs::NavSatFix waypoint11;
+
+    // waypoint1.latitude = 52.762018;
+    // waypoint1.longitude  = -1.240814;
+    // waypoint1.altitude = 10;
+
+    waypoint1.latitude = 52.762905;
+    waypoint1.longitude  = -1.240814;
+    waypoint1.altitude = 10;
+
+    waypoint2.latitude = 52.762199 ;   
+    waypoint2.longitude  = -1.240455;
+    waypoint2.altitude = 10;
+
+    waypoint3.latitude =  52.762391;
+    waypoint3.longitude  = -1.240010;
+    waypoint3.altitude = 10;
+   
+
+    waypoint4.latitude = 52.762571; 
+    waypoint4.longitude  = -1.239638;
+    waypoint4.altitude = 10;
+
+    waypoint5.latitude =  52.762905;
+    waypoint5.longitude = -1.238920;
+    waypoint5.altitude = 10;
+
+    waypoint6.latitude = 52.763293;  
+    waypoint6.longitude  = -1.238135;
+    waypoint6.altitude = 10;
+
+    waypoint7.latitude =  52.763514; 
+    waypoint7.longitude  = -1.237585;
+    waypoint7.altitude = 10;
+
+    waypoint8.latitude =  52.762837; 
+    waypoint8.longitude  = -1.238250;
+    waypoint8.altitude = 10;
+
+    waypoint9.latitude =  52.762660; 
+    waypoint9.longitude  = -1.238014;
+    waypoint9.altitude = 10;
+
+    waypoint10.latitude = 52.762449 ;
+    waypoint10.longitude  = -1.237724;
+    waypoint10.altitude = 10;
+
+
+  appendFlightPlan(waypoint1);
+  //appendFlightPlan(waypoint2);
+ // appendFlightPlan(waypoint3);
+//   appendFlightPlan(waypoint4);
+//   appendFlightPlan(waypoint5);
+//   appendFlightPlan(waypoint6);
+//   appendFlightPlan(waypoint7);
+//   appendFlightPlan(waypoint8);
+//   appendFlightPlan(waypoint9);
+//   appendFlightPlan(waypoint10);
+
+   // run mission.
+           if(flightControl.check_M100())
+            {
+                ROS_INFO("M100 Drone taking off");
+                takeoff_result = flightControl.M100monitoredTakeoff();
+
+            }
+            else
+            {
+
+                // Drone is an A3/N3 variant
+                ROS_INFO("Custom Drone taking off");
+                takeoff_result = flightControl.monitoredTakeoff();
+
+            }
+
+            if(takeoff_result)
+            {
+                start_gps_location = current_gps_location;
+                 start_local_position = current_local_position;
+                reset(current_gps_location, current_local_position);
+
+                ROS_INFO("Initiating mission");
+
+                while(ros::ok())
+                {
+                    ros::spinOnce();
+                    runMission();
+                }
+            }
         
     
 }
@@ -98,41 +204,41 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
        case 0x2A:
        {
            // run mission.
-           if(flightControl.check_M100())
-            {
-                ROS_INFO("M100 Drone taking off");
-                takeoff_result = flightControl.M100monitoredTakeoff();
+        //    if(flightControl.check_M100())
+        //     {
+        //         ROS_INFO("M100 Drone taking off");
+        //         takeoff_result = flightControl.M100monitoredTakeoff();
 
-            }
-            else
-            {
+        //     }
+        //     else
+        //     {
 
-                // Drone is an A3/N3 variant
-                ROS_INFO("Custom Drone taking off");
-                takeoff_result = flightControl.monitoredTakeoff();
+        //         // Drone is an A3/N3 variant
+        //         ROS_INFO("Custom Drone taking off");
+        //         takeoff_result = flightControl.monitoredTakeoff();
 
-            }
+        //     }
 
-            if(takeoff_result)
-            {
-                reset(current_gps_location, current_local_position);
+        //     if(takeoff_result)
+        //     {
+        //         reset(current_gps_location, current_local_position);
 
-                ROS_INFO("Initiating mission");
+        //         ROS_INFO("Initiating mission");
 
-                while(ros::ok())
-                {
-                    ros::spinOnce();
-                    runMission();
-                }
+        //         while(ros::ok())
+        //         {
+        //             ros::spinOnce();
+        //             runMission();
+        //         }
 
-            }
+        //     }
 
-            else
-            {
-                ROS_INFO("Drone failed to take off");
-            }
+        //     else
+        //     {
+        //         ROS_INFO("Drone failed to take off");
+        //     }
 
-            }
+        }
 
 
             default:
@@ -166,7 +272,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   geometry_msgs::Vector3     localOffset;
 
   float speedFactor         = 2;
-  float yawThresholdInDeg   = 5;
+  float yawThresholdInDeg   = 2;
 
   float xCmd, yCmd, zCmd;
 
@@ -182,30 +288,31 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   
   // double yawDesiredRad      = atan2(yOffsetRemaining, xOffsetRemaining);
 
-  info_counter++;
+info_counter++;
   if(info_counter > 25)
   {
     info_counter = 0;
-    ROS_INFO("-----x=%f, y=%f, z=%f, yaw=%f ...", localOffset.x,localOffset.y, localOffset.z,yawInRad);
-    ROS_INFO("+++++dx=%f, dy=%f, dz=%f, dyaw=%f ...", xOffsetRemaining,yOffsetRemaining, zOffsetRemaining,yawInRad - yawDesiredRad);
+    ROS_INFO( "-----x=%f, y=%f, z=%f, yaw=%f ...", localOffset.x,localOffset.y, localOffset.z,yawInRad);
+    ROS_INFO( "+++++dx=%f, dy=%f, dz=%f, dyaw=%f ...", xOffsetRemaining,yOffsetRemaining, zOffsetRemaining,yawInRad - yawDesiredRad);
+    ROS_INFO( "inbound_counter %d", inbound_counter );
   }
 
-  if (abs(xOffsetRemaining) >= speedFactor)
-    xCmd = (xOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
-  else
-    xCmd = xOffsetRemaining;
+    if (abs(xOffsetRemaining) >= speedFactor)
+        xCmd = (xOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    else
+        xCmd = xOffsetRemaining;
 
-  if (abs(yOffsetRemaining) >= speedFactor)
-    yCmd = (yOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
-  else
-    yCmd = yOffsetRemaining;
+    if (abs(yOffsetRemaining) >= speedFactor)
+        yCmd = (yOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    else
+        yCmd = yOffsetRemaining;
 
-    //    if (abs(zOffsetRemaining) >= speedFactor)
-    //     yCmd = (zOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
-    //   else
-    //     zCmd = zOffsetRemaining;
+    if (abs(zOffsetRemaining) >= speedFactor)
+    zCmd = (zOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    else
+    zCmd = zOffsetRemaining;
 
-    zCmd = start_local_position.z + target_offset_z;
+    //zCmd = start_local_position.z + target_offset_z;
 
     /*!
    * @brief: if we already started breaking, keep break for 50 sample (1sec)
@@ -220,6 +327,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
 
     else if (break_counter > 0)
     {
+        ROS_INFO("Incrementing Break Counter");
         droneControlSignal(0,0,0,0);
         break_counter++;
         return;
@@ -232,14 +340,18 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
         //     // don't yaw the drone
         //     droneControlSignal(xCmd, yCmd, zCmd, 0, true, true);
         // }
+
         droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
 
     }
 
-    if (std::abs(xOffsetRemaining) < 0.5 &&std::abs(yOffsetRemaining) < 0.5 && std::abs(zOffsetRemaining) < 0.5
-        && std::abs(yawInRad - yawDesiredRad) < yawThresholdInRad)
+    if (std::abs(xOffsetRemaining) < 0.5 &&
+        std::abs(yOffsetRemaining) < 0.5 && 
+        std::abs(zOffsetRemaining) < 0.5) //&&
+    //    std::abs(yawInRad - yawDesiredRad) < yawThresholdInRad)
         {
             //! 1. We are within bounds; start incrementing our in-bound counter
+            ROS_INFO("We are close.");
              inbound_counter ++;
         }
 
@@ -372,13 +484,18 @@ void FlightPlanner::droneControlSignalPID(double x, double y, double z, double y
 
 void FlightPlanner::reset(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Point &current_local_pos)
 {
+
+    
     inbound_counter = 0;
     outbound_counter = 0;
     break_counter = 0;
 
     bool waypoint_finished = true;
+    
     state = MissionState::NEW_WAYPOINT;
+    ROS_INFO("waypoint index: %d", waypoint_index);
     setWaypoint(flight_plan[waypoint_index]);
+    ROS_INFO("Didn't reach here");
     // increment waypoint to next waypoint
     waypoint_index++;
 
@@ -395,6 +512,9 @@ void FlightPlanner::setWaypoint(sensor_msgs::NavSatFix newWaypoint)
    geometry_msgs::Vector3 offset_from_target;
 
    // get GPS offset
+
+   ROS_INFO("Waypoint COORDINATES: %f  %f  %f", flight_plan[waypoint_index].latitude, flight_plan[waypoint_index].longitude, flight_plan[waypoint_index].altitude );
+
    localOffsetFromGpsOffset(offset_from_target, newWaypoint, start_gps_location );
    ROS_INFO("new Waypoint target offset x: %f y: %f z: %f ", offset_from_target.x, offset_from_target.y, offset_from_target.z);
 
@@ -407,6 +527,7 @@ void FlightPlanner::setWaypoint(sensor_msgs::NavSatFix newWaypoint)
 
 bool FlightPlanner::reachedWaypoint()
 {
+    ROS_INFO("We've reached waypoint");
    if(!waypoint_finished)
    {
        return false;
@@ -469,6 +590,8 @@ void FlightPlanner::onWaypointReached()
 
 void FlightPlanner::onMissionFinished()
 {
+
+    ROS_INFO("We've finished the mission");
     state = MissionState::FINISHED;
     // clear flight plan
     flight_plan.clear();
@@ -479,6 +602,10 @@ void FlightPlanner::localOffsetFromGpsOffset(geometry_msgs::Vector3& deltaENU, s
 {
         double deltaLon = target.longitude - origin.longitude;
         double deltaLat = target.latitude - origin.latitude;
+
+        // ROS_INFO("delta LAt:  %f", deltaLat);
+
+        // ROS_INFO("delta LON:  %f", deltaLon);
 
         deltaENU.y = Deg_To_Rad(deltaLat) * C_EARTH;
         deltaENU.x = Deg_To_Rad(deltaLon) * C_EARTH * cos(Deg_To_Rad(target.latitude));
@@ -503,6 +630,8 @@ void FlightPlanner::runMission()
     /// check what state the mission is in:
 
     // run in 50Hz loop
+
+    //ROS_INFO ("Run Mission Loop");
     if(elapsed_time > ros::Duration(0.02))
     {
         start_time = ros::Time::now();
@@ -529,6 +658,7 @@ void FlightPlanner::runMission()
 
             case MissionState::NEW_WAYPOINT:
             {   
+                //ROS_INFO("New waypoint");
                 // if if mission isn't finished, keep stepping through mission.
                 if(!reachedWaypoint())
                 {
@@ -571,8 +701,16 @@ void FlightPlanner::runMission()
 
                 flightControl.M100monitoredLanding();
 
+                ROS_INFO("End of Mission");
+
                 break;
 
+            }
+
+
+            default:
+            {
+                break;
             }
         }
     }
@@ -604,10 +742,13 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "Flight Control");
 
-     FlightPlanner FlightPlanner();
+     FlightPlanner flight_planner;
+
+     ROS_INFO("Running");
 
 
     ros::spin();
 
     return 0;
 }
+

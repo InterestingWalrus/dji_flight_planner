@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(m100_flight_planner)
+project(dji_flight_planner)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -19,6 +19,13 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(DJIOSDK REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES dji_odom_adapter
+#  CATKIN_DEPENDS dji_sdk nav_msgs roscpp rospy sensor_msgs std_msgs
+#  DEPENDS system_lib
+)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
@@ -31,16 +38,16 @@ include_directories(
 )
 
 
-add_executable(dji_flight_planner src/flight_control.cpp src/flight_planner.cpp src/mobile_comm.cpp src/PID.cpp )
+add_executable(m100_flight_planner src/flight_control.cpp src/flight_planner.cpp src/mobile_comm.cpp src/PID.cpp )
 
 
-target_link_libraries(dji_flight_planner
+target_link_libraries(m100_flight_planner
 		${catkin_LIBRARIES}
 		${EIGEN_LIBRARIES}
                 ${DJIOSDK_LIBRARIES}
 		)
 
-add_dependencies(dji_flight_planner dji_sdk_generate_messages_cpp)
+add_dependencies(m100_flight_planner dji_sdk_generate_messages_cpp)
 
 install(DIRECTORY launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
