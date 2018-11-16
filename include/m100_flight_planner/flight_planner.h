@@ -90,6 +90,9 @@ class FlightPlanner
     int waypoint_count;
     int outbound_counter;
     int inbound_counter;
+
+
+    int state_1;
     int break_counter;
 
     dji_sdk::MobileData data_from_mobile;

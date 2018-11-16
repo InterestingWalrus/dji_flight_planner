@@ -386,13 +386,13 @@ bool FlightControl::M100monitoredLanding()
   if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_ON_GROUND ||
       current_gps.altitude - home_altitude > 1.0)
   {
-    ROS_ERROR("Landing failed.");
+    ROS_ERROR_ONCE("Landing failed.");
     return false;
   }
   else
   {
     start_time = ros::Time::now();
-    ROS_INFO("Successful Landing!");
+    ROS_INFO_ONCE("Successful Landing!");
     ros::spinOnce();
   }
 
