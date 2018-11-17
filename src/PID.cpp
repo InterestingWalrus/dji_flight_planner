@@ -3,9 +3,9 @@
 PID::PID()
 {
     dt = 0.02;
-    Kp= 0.05;
+    Kp= 0.5;
     Ki = 0.001;
-    Kd = 0.000001;
+    Kd = 0.00001;
     prev_error = 0;
     integral = 0;
 
@@ -50,7 +50,7 @@ double PID::calculate(double target_val, double actual_val , double minVal, doub
 
     prev_error = error;
     
-    ROS_INFO("Output: %f " , output);
+    //ROS_INFO("Output: %f " , output);
 
     return output;
 

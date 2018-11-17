@@ -95,6 +95,8 @@ class FlightPlanner
     int state_1;
     int break_counter;
 
+    float speedFactor;
+
     dji_sdk::MobileData data_from_mobile;
     unsigned char data_to_mobile[10];
 

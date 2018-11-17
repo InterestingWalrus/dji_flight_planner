@@ -9,11 +9,13 @@ FlightControl::FlightControl()
    query_version_service      = nh.serviceClient<dji_sdk::QueryDroneVersion>("dji_sdk/query_drone_version");
    drone_activation_service = nh.serviceClient<dji_sdk::Activation>("dji_sdk/activation");
    set_local_pos_reference    = nh.serviceClient<dji_sdk::SetLocalPosRef> ("dji_sdk/set_local_pos_ref");
+
    
 
    gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
    gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
    flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
+    height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
 
     
 }
@@ -130,6 +132,13 @@ bool FlightControl::obtainControl()
     }
 
     return true;
+
+}
+
+
+void FlightControl::height_callback(const std_msgs::Float32::ConstPtr& msg)
+{
+    takeoff_height = msg->data;
 
 }
 
@@ -363,11 +372,27 @@ bool FlightControl::M100monitoredTakeoff()
   return true;
 }
 
+
+// returns the time required for the drone to land. 
+float FlightControl::computeTimeToLand()
+{
+  int droneLandSpeed = 1;
+
+  float current_height = takeoff_height;
+
+  float timeToLand = (current_height / droneLandSpeed) + 5.0;
+
+  ROS_INFO("Time required to land is %f", timeToLand);
+
+   return timeToLand; 
+}
+
 bool FlightControl::M100monitoredLanding()
 {
-   ros::Time start_time = ros::Time::now();
+  ros::Time start_time = ros::Time::now();
 
   float home_altitude = current_gps.altitude;
+  float rosTime_to_land = computeTimeToLand();
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND))
   {
     return false;
@@ -376,8 +401,8 @@ bool FlightControl::M100monitoredLanding()
   ros::Duration(0.01).sleep();
   ros::spinOnce();
 
-  // Step 1: If M100 is not in the air after 10 seconds, fail.
-  while (ros::Time::now() - start_time < ros::Duration(10) || flight_status == DJISDK::M100FlightStatus::M100_STATUS_LANDING)
+  // compute wait time to be based on relative altitude of drone / drone descent speed : which is at 1 m/s
+  while (ros::Time::now() - start_time < ros::Duration(rosTime_to_land) || flight_status == DJISDK::M100FlightStatus::M100_STATUS_LANDING)
   {
     ros::Duration(0.01).sleep();
     ros::spinOnce();

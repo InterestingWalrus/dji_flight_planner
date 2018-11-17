@@ -5,6 +5,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <std_msgs/UInt8.h>
+#include <std_msgs/Float32.h>
 
 // DJI SDK includes
 #include <dji_sdk/DroneTaskControl.h>
@@ -54,11 +55,14 @@ class FlightControl
         void display_mode_callback(const std_msgs::UInt8::ConstPtr& msg);
         void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void gps_health_callback(const std_msgs::UInt8::ConstPtr& msg);
+        void height_callback(const std_msgs::Float32::ConstPtr& msg);
         bool check_M100();
         bool M100monitoredTakeoff();
         bool M100monitoredLanding();
         bool takeoff_land(int task);
         bool set_local_position();
+
+        float computeTimeToLand(); // based on a 1 m/s descent speed
        
 
 
@@ -74,7 +78,9 @@ class FlightControl
     ros::ServiceClient mobile_data_service;
     ros::Subscriber gps_sub;
     ros::Subscriber gps_health_sub;
-     ros::Subscriber flightStatusSub;
+    ros::Subscriber flightStatusSub;
+    ros::Subscriber height_sub;
+
 
 
     uint8_t flight_status = 255;
@@ -82,9 +88,10 @@ class FlightControl
     
 
     
-  sensor_msgs::NavSatFix current_gps; 
+    sensor_msgs::NavSatFix current_gps; 
     
-  uint8_t gps_health;
+    uint8_t gps_health;
+    float takeoff_height;
    
 
 

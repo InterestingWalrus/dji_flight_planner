@@ -34,6 +34,8 @@ FlightPlanner::FlightPlanner()
 
      state_1 = 0;
 
+     speedFactor = 15;
+
     sensor_msgs::NavSatFix waypoint1;
     sensor_msgs::NavSatFix waypoint2;
     sensor_msgs::NavSatFix waypoint3;
@@ -93,12 +95,12 @@ FlightPlanner::FlightPlanner()
 
 
   appendFlightPlan(waypoint1);
-  appendFlightPlan(waypoint2);
-  appendFlightPlan(waypoint3);
+//   appendFlightPlan(waypoint2);
+//   appendFlightPlan(waypoint3);
 //   appendFlightPlan(waypoint4);
 //   appendFlightPlan(waypoint5);
 //   appendFlightPlan(waypoint6);
-//   appendFlightPlan(waypoint7);
+//    appendFlightPlan(waypoint7);
 //   appendFlightPlan(waypoint8);
 //   appendFlightPlan(waypoint9);
 //   appendFlightPlan(waypoint10);
@@ -126,9 +128,9 @@ FlightPlanner::FlightPlanner()
                 start_gps_location = current_gps_location;
                  start_local_position = current_local_position;
                 
-                state = MissionState::NEW_WAYPOINT;
+                //state = MissionState::NEW_WAYPOINT;
 
-                setWaypoint(flight_plan[waypoint_index]);
+              //  setWaypoint(flight_plan[waypoint_index]);
 
                 //waypoint_index ++;
 
@@ -287,7 +289,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   static int info_counter = 0;
   geometry_msgs::Vector3     localOffset;
 
-  float speedFactor         = 10;
+//   float speedFactor         = 15;
   float yawThresholdInDeg   = 2;
 
   float xCmd, yCmd, zCmd;
@@ -299,7 +301,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   double zOffsetRemaining = target_offset_z - localOffset.z;
 
  // double yawDesiredRad     = Deg_To_Rad(target_yaw);  // This is shit...
- double yawDesiredRad = Deg_To_Rad(20);
+  double yawDesiredRad = Deg_To_Rad(20);
   double yawThresholdInRad = Deg_To_Rad(yawThresholdInDeg);
   double yawInRad          = toEulerAngle(current_atti).z;
   
@@ -341,7 +343,7 @@ info_counter++;
    */
     if (break_counter > 50)
     {
-        ROS_INFO("##### Route %d finished....", waypoint_index);
+        ROS_INFO("##### Route %d finished....", waypoint_index + 1);
         waypoint_finished = true;
         return;
     }
@@ -349,7 +351,8 @@ info_counter++;
     else if (break_counter > 0)
     {
         ROS_INFO_ONCE("Incrementing Break Counter");
-        droneControlSignal(0,0,0,0);
+        //droneControlSignal(0,0,0,0);
+        droneControlSignalPID(0, 0, 0, 0);
         break_counter++;
         return;
     }
@@ -362,7 +365,8 @@ info_counter++;
         //     droneControlSignal(xCmd, yCmd, zCmd, 0, true, true);
         // }
 
-        droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
+        //droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
+        droneControlSignalPID(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
 
     }
 
@@ -389,14 +393,14 @@ info_counter++;
     //! 3. Reset withinBoundsCounter if necessary
     if (outbound_counter > 10)
     {
-        ROS_INFO( "##### Route %d: out of bounds, reset....", waypoint_index);
+        ROS_INFO( "##### Route %d: out of bounds, reset....", waypoint_index + 1);
         inbound_counter  = 0;
         outbound_counter = 0;
     }
 
     if (inbound_counter > 50)
     {
-        ROS_INFO_ONCE("##### Route %d start break....", waypoint_index);
+        ROS_INFO_ONCE("##### Route %d start break....", waypoint_index + 1);
         break_counter = 1;
     }
 
@@ -421,7 +425,7 @@ void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt)
      // if waypoint count isn't zero and is equal to number of waypoint index, 
      // we can safely assume the mission is finished..
 
-     if(waypoint_count != 0 && (waypoint_index -1) == waypoint_count)
+     if(waypoint_index >= waypoint_count)
      {
          ROS_INFO("Mission Waypoint count: %d", waypoint_count);
          ROS_INFO("Mission Finished Waypoint index %d", waypoint_index );
@@ -474,9 +478,9 @@ void FlightPlanner::droneControlSignalPID(double x, double y, double z, double y
 
     sensor_msgs::Joy controlPosYaw;
 
-    x = pid.calculate(target_offset_x, current_local_position.x, 0.1, 30 );
-    y = pid.calculate(target_offset_y, current_local_position.y, 0.01, 30 );
-    z = pid.calculate(target_offset_z, current_local_position.z, -0.01, 5 );
+    x = pid.calculate(target_offset_x, current_local_position.x, -speedFactor, speedFactor );
+    y = pid.calculate(target_offset_y, current_local_position.y, -speedFactor, speedFactor );
+    z = pid.calculate(target_offset_z, current_local_position.z, -speedFactor, speedFactor );
 
     controlPosYaw.axes.push_back(x);
     controlPosYaw.axes.push_back(y);
@@ -562,7 +566,7 @@ bool FlightPlanner::reachedWaypoint()
 {
     if(waypoint_finished)
     {
-        ROS_INFO("We've reached waypoint");
+        ROS_INFO("We've reached waypoint %d", waypoint_index+1);
        return true;
     }
 
@@ -587,39 +591,43 @@ void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint)
 }
 
 void FlightPlanner::onWaypointReached()
-{
+{ 
     
-    // if(waypoint_index == 4)
-    // {
-    //     bool performTask;
+    if(waypoint_index == 4)  
+    {
+        bool performTask;
 
-    //     if(flightControl.check_M100())
-    //     {
-    //          performTask = flightControl.M100monitoredLanding();
+        if(flightControl.check_M100())
+        {
+             performTask = flightControl.M100monitoredLanding();
 
-    //     }
+             ROS_INFO_ONCE("Landing at the %dth waypoint", waypoint_index+1);
 
-    //     else
-    //     {
-    //         //performTask = flightControl.monitoredLanding();
-    //         // This doesn;t work on S1000 for now.
-    //         flightControl.land();
-    //     }
+        }
+
+        else
+        {
+            //performTask = flightControl.monitoredLanding();
+            // This doesn;t work on S1000 for now.
+            flightControl.land();
+        }
         
 
-    //     if(performTask)
-    //     {
-    //         // Pause for a period of time here...
-    //         ros::Duration(30).sleep();
+        if(performTask)
+        {
+            // Pause for a period of time here...
+            ros::Duration(30).sleep();
 
-    //         flightControl.monitoredTakeoff();
-    //     }
+            flightControl.monitoredTakeoff();
+        }
 
-    //     else
-    //     {
-    //         ROS_ERROR("Unsucessful landing of drone");
-    //     }
-    // }
+        else
+        {
+            ROS_ERROR("Unsucessful landing of drone");
+        }
+    }
+
+    waypoint_index++;
 
     state = MissionState::ARRIVED;
 }
@@ -674,10 +682,16 @@ void FlightPlanner::runMission()
                     outbound_counter = 0;
                     break_counter = 0;
                     waypoint_finished = false;
-                    start_gps_location = current_gps_location;
-                    start_local_position = current_local_position;
-                   // setWaypoint(flight_plan[waypoint_index]);
-                    ROS_INFO("MISSION START ROUTE %d / %d ", waypoint_index, waypoint_count);
+                    //start_gps_location = current_gps_location;
+                    //start_local_position = current_local_position;
+                    setWaypoint(flight_plan[waypoint_index]);
+                    
+                    ROS_INFO("MISSION START ROUTE FROM IDLE %d / %d ", waypoint_index+1, waypoint_count);
+                    
+                    state = MissionState::NEW_WAYPOINT;
+                   // waypoint_index++;
+                    ROS_INFO("Next Index %d ", waypoint_index);
+
                 }
 
                 else
@@ -724,9 +738,11 @@ void FlightPlanner::runMission()
                     waypoint_finished = false;
                     start_gps_location = current_gps_location;
                     start_local_position = current_local_position;
-                    setWaypoint(flight_plan[waypoint_index++]);
-                    ROS_INFO("MISSION START ROUTE ARRIVED %d / %d ", waypoint_index, waypoint_count);
+                    setWaypoint(flight_plan[waypoint_index]);
+                   
+                    ROS_INFO("MISSION START ROUTE ARRIVED %d / %d ", waypoint_index+1, waypoint_count);
                     state = MissionState::NEW_WAYPOINT;
+                    // waypoint_index++;
 
                 }
 
@@ -741,7 +757,7 @@ void FlightPlanner::runMission()
             case MissionState::FINISHED:
             {
 
-                flightControl.M100monitoredLanding();
+                flightControl.land(); // use this for now....
 
                 ROS_INFO_ONCE("End of Mission");
 
