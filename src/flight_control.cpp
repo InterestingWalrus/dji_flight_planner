@@ -152,7 +152,8 @@ bool FlightControl::takeoff_land(int task)
 
   if(!droneTaskControl.response.result)
   {
-    ROS_ERROR("takeoff_land fail");
+    //ROS_ERROR("takeoff_land fail");
+    ROS_ERROR("wut?");
     return false;
   }
 
@@ -376,11 +377,25 @@ bool FlightControl::M100monitoredTakeoff()
 // returns the time required for the drone to land. 
 float FlightControl::computeTimeToLand()
 {
+
   int droneLandSpeed = 1;
+
+
 
   float current_height = takeoff_height;
 
-  float timeToLand = (current_height / droneLandSpeed) + 5.0;
+  float timeToLand = (current_height / droneLandSpeed) ;
+
+  
+
+  // Maximum time drone will take to land from an altitude of 100 metres is 55 seconds.. 
+  // Tested in simulator
+  //TODO use Velocity Z to compute variable time to land)
+
+  if (timeToLand > 55)
+  {
+    timeToLand = 55;
+  }
 
   ROS_INFO("Time required to land is %f", timeToLand);
 
@@ -391,8 +406,10 @@ bool FlightControl::M100monitoredLanding()
 {
   ros::Time start_time = ros::Time::now();
 
+  float rosTime_to_land = computeTimeToLand() + 5;
   float home_altitude = current_gps.altitude;
-  float rosTime_to_land = computeTimeToLand();
+  
+
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND))
   {
     return false;

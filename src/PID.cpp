@@ -3,9 +3,9 @@
 PID::PID()
 {
     dt = 0.02;
-    Kp= 0.5;
-    Ki = 0.001;
-    Kd = 0.00001;
+    Kp= 15.00;
+    Ki = 5.29;
+    Kd = 0;
     prev_error = 0;
     integral = 0;
 
@@ -21,7 +21,7 @@ void PID::resetController()
 double PID::calculate(double target_val, double actual_val , double minVal, double maxVal )
 {
 
-    double error = actual_val - target_val;
+    double error =  target_val - actual_val;
 
     // Proportional Term 
     double P_out = Kp * error;

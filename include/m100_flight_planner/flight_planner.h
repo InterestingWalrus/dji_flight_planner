@@ -145,6 +145,10 @@ class FlightPlanner
     ros::Subscriber local_position_sub;
     ros::Subscriber mobile_data_subscriber;
 
+
+    double sampleX;
+    double sampleY;
+
     
 
 

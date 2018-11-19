@@ -30,11 +30,11 @@ FlightPlanner::FlightPlanner()
     inbound_counter = 0;
     outbound_counter = 0;
     break_counter = 0;
-    target_yaw = 0;
+    target_yaw = 50;
 
      state_1 = 0;
 
-     speedFactor = 15;
+     speedFactor = 5;
 
     sensor_msgs::NavSatFix waypoint1;
     sensor_msgs::NavSatFix waypoint2;
@@ -52,9 +52,15 @@ FlightPlanner::FlightPlanner()
     // waypoint1.longitude  = -1.240814;
     // waypoint1.altitude = 10;
 
-    waypoint1.latitude = 52.762905;
-    waypoint1.longitude  = -1.240814;
-    waypoint1.altitude = 10;
+    // waypoint1.latitude = 52.762905;
+    // waypoint1.longitude  = -1.240814;
+    // waypoint1.altitude = 10;
+
+
+    waypoint1.latitude = 52.756187;
+    waypoint1.longitude  = -1.246298;
+    waypoint1.altitude = 100;
+
 
     waypoint2.latitude = 52.762199 ;   
     waypoint2.longitude  = -1.240455;
@@ -301,7 +307,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   double zOffsetRemaining = target_offset_z - localOffset.z;
 
  // double yawDesiredRad     = Deg_To_Rad(target_yaw);  // This is shit...
-  double yawDesiredRad = Deg_To_Rad(20);
+  double yawDesiredRad = Deg_To_Rad(target_yaw);
   double yawThresholdInRad = Deg_To_Rad(yawThresholdInDeg);
   double yawInRad          = toEulerAngle(current_atti).z;
   
@@ -351,8 +357,8 @@ info_counter++;
     else if (break_counter > 0)
     {
         ROS_INFO_ONCE("Incrementing Break Counter");
-        //droneControlSignal(0,0,0,0);
-        droneControlSignalPID(0, 0, 0, 0);
+        droneControlSignal(0,0,0,0);
+       // droneControlSignalPID(0, 0, 0, 0);
         break_counter++;
         return;
     }
@@ -365,8 +371,8 @@ info_counter++;
         //     droneControlSignal(xCmd, yCmd, zCmd, 0, true, true);
         // }
 
-        //droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
-        droneControlSignalPID(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
+        droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
+        //droneControlSignalPID(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
 
     }
 
@@ -481,9 +487,11 @@ void FlightPlanner::droneControlSignalPID(double x, double y, double z, double y
     x = pid.calculate(target_offset_x, current_local_position.x, -speedFactor, speedFactor );
     y = pid.calculate(target_offset_y, current_local_position.y, -speedFactor, speedFactor );
     z = pid.calculate(target_offset_z, current_local_position.z, -speedFactor, speedFactor );
+   // sampleX = x;
+   // sampleY = y;
 
     controlPosYaw.axes.push_back(x);
-    controlPosYaw.axes.push_back(y);
+   controlPosYaw.axes.push_back(y);
     controlPosYaw.axes.push_back(z);
     controlPosYaw.axes.push_back(yaw);
 
@@ -757,10 +765,15 @@ void FlightPlanner::runMission()
             case MissionState::FINISHED:
             {
 
-                flightControl.land(); // use this for now....
+               ROS_INFO_ONCE("End of Mission");
 
-                ROS_INFO_ONCE("End of Mission");
+               //flightControl.land(); // use this for now....
 
+              ros::Duration(0.5).sleep();
+
+              flightControl.M100monitoredLanding();
+ 
+              // state = MissionState::IDLE;
                 break;
 
             }
