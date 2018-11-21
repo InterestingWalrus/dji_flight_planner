@@ -3,8 +3,10 @@
 FlightPlanner::FlightPlanner()
 {
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
-    gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
-    local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
+    //gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+    gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);
+   // local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
+    local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this);
     attitude_sub = nh.subscribe("/dji_sdk/attitude", 10, &FlightPlanner::attitude_callback, this);
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
@@ -52,14 +54,14 @@ FlightPlanner::FlightPlanner()
     // waypoint1.longitude  = -1.240814;
     // waypoint1.altitude = 10;
 
-    // waypoint1.latitude = 52.762905;
-    // waypoint1.longitude  = -1.240814;
-    // waypoint1.altitude = 10;
+    waypoint1.latitude = 52.762905;
+    waypoint1.longitude  = -1.240814;
+    waypoint1.altitude = 10;
 
 
-    waypoint1.latitude = 52.756187;
-    waypoint1.longitude  = -1.246298;
-    waypoint1.altitude = 100;
+    // waypoint1.latitude = 52.756187;
+    // waypoint1.longitude  = -1.246298;
+    // waypoint1.altitude = 100;
 
 
     waypoint2.latitude = 52.762199 ;   
@@ -101,15 +103,15 @@ FlightPlanner::FlightPlanner()
 
 
   appendFlightPlan(waypoint1);
-//   appendFlightPlan(waypoint2);
-//   appendFlightPlan(waypoint3);
-//   appendFlightPlan(waypoint4);
-//   appendFlightPlan(waypoint5);
-//   appendFlightPlan(waypoint6);
-//    appendFlightPlan(waypoint7);
-//   appendFlightPlan(waypoint8);
-//   appendFlightPlan(waypoint9);
-//   appendFlightPlan(waypoint10);
+  appendFlightPlan(waypoint2);
+  appendFlightPlan(waypoint3);
+  appendFlightPlan(waypoint4);
+  appendFlightPlan(waypoint5);
+  appendFlightPlan(waypoint6);
+   appendFlightPlan(waypoint7);
+  appendFlightPlan(waypoint8);
+  appendFlightPlan(waypoint9);
+  appendFlightPlan(waypoint10);
 
    // run mission.
 
@@ -118,6 +120,7 @@ FlightPlanner::FlightPlanner()
             {
                 ROS_INFO("M100 Drone taking off");
                 takeoff_result = flightControl.M100monitoredTakeoff();
+               
 
             }
             else
@@ -773,7 +776,7 @@ void FlightPlanner::runMission()
 
               flightControl.M100monitoredLanding();
  
-              // state = MissionState::IDLE;
+               state = MissionState::IDLE;
                 break;
 
             }
@@ -799,9 +802,22 @@ void FlightPlanner::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 }
 
 
+void FlightPlanner::ekf_gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
+{
+    current_gps_location = *msg;
+
+    ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
+}
+
 void FlightPlanner::local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
     current_local_position = msg->point;
+
+}
+
+void FlightPlanner::ekf_odometry_callback(const nav_msgs::Odometry::ConstPtr& msg)
+{
+   current_local_position = msg->pose.pose.position;
 
 }
 

@@ -6,6 +6,7 @@
 #include <geometry_msgs/QuaternionStamped.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <nav_msgs/Odometry.h>
 #include <std_msgs/UInt8.h>
 
 // DJI SDK includes
@@ -76,7 +77,11 @@ class FlightPlanner
 
         void MobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& from_mobile_data);
         void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
+
+        void ekf_gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg);
+
+        void ekf_odometry_callback(const nav_msgs::Odometry::ConstPtr& msg);
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 

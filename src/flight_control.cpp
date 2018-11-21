@@ -13,6 +13,7 @@ FlightControl::FlightControl()
    
 
    gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
+  // gps_sub = nh.subscribe("gps/filtered", 10, &FlightControl::gps_callback, this);
    gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
    flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
     height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
@@ -35,7 +36,7 @@ void FlightControl::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
   current_gps.latitude = msg->latitude;
   current_gps.longitude = msg->longitude;
   current_gps.altitude = msg->altitude;
-  //ROS_INFO ("GPS:  %f , %f, %f,", current_gps.latitude, current_gps.longitude, current_gps.altitude);
+  //ROS_INFO_THROTTLE (0.1, "GPS: %f: ", current_gps.altitude);
 }
  
 void FlightControl::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
@@ -152,8 +153,8 @@ bool FlightControl::takeoff_land(int task)
 
   if(!droneTaskControl.response.result)
   {
-    //ROS_ERROR("takeoff_land fail");
-    ROS_ERROR("wut?");
+    ROS_ERROR("takeoff_land fail");
+   
     return false;
   }
 
@@ -340,10 +341,11 @@ bool FlightControl::M100monitoredTakeoff()
   float home_altitude = current_gps.altitude;
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF))
   {
+    ROS_INFO("Did this fail?:");
     return false;
   }
 
-  ros::Duration(0.01).sleep();
+  ros::Duration(7).sleep();
   ros::spinOnce();
 
   // Step 1: If M100 is not in the air after 10 seconds, fail.
