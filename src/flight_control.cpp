@@ -376,6 +376,7 @@ bool FlightControl::M100monitoredTakeoff()
 }
 
 
+
 // returns the time required for the drone to land. 
 float FlightControl::computeTimeToLand()
 {

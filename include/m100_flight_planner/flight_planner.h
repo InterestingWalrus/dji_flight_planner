@@ -24,6 +24,8 @@
 #include "m100_flight_planner/flight_control.h"
 #include "m100_flight_planner/mobile_comm.h"
 #include "m100_flight_planner/PID.h"
+#include <queue>
+
 
 #define PI (double) 3.141592653589793
 #define C_EARTH (double)6378137.0
@@ -62,13 +64,17 @@ class FlightPlanner
         void setWaypoint(sensor_msgs::NavSatFix newWaypoint);
         void step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
         void reset(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Point &current_local_pos);
+
+        void stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
         bool isMissionFinished();
         bool reachedWaypoint();
         void onWaypointReached();
         void onMissionFinished();
         void runMission();
-        void prepareFlightPlan(double lat, double lon, double alt);
-        void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint);
+
+        void returnHome();
+        void prepareFlightPlan(double lat, double lon, double alt, unsigned char samplingTask);
+        void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
         void localOffsetFromGpsOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
         void droneControlSignalPID(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
@@ -96,11 +102,14 @@ class FlightPlanner
     int outbound_counter;
     int inbound_counter;
 
+    int home_inbound_counter ;
+    int home_outbound_counter;
+    int home_break_counter ;
+
 
     int state_1;
     int break_counter;
-
-    float speedFactor;
+   
 
     dji_sdk::MobileData data_from_mobile;
     unsigned char data_to_mobile[10];
@@ -109,22 +118,48 @@ class FlightPlanner
     float target_offset_y;
     float target_offset_z;
     float target_yaw;
+
+
+    float home_target_offset_x;
+    float home_target_offset_y;
+    float home_target_offset_z;
+
     sensor_msgs::NavSatFix start_gps_location;
     geometry_msgs::Point start_local_position;
 
     sensor_msgs::NavSatFix current_gps_location;
+
+    sensor_msgs::NavSatFix home_gps_location;
     geometry_msgs::Point current_local_position;
     geometry_msgs::Quaternion current_drone_attitude;
 
     std::vector<sensor_msgs::NavSatFix> flight_plan;
 
+    std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > flight_plan_1;
+
+    
+
     bool waypoint_finished;
     bool obtain_control;
     bool takeoff_result;
+    bool homeReached;
 
     unsigned char latitude_array[8] = {0};
     unsigned char longitude_array[8] = {0};
     unsigned char altitude_array[4] = {0};
+    unsigned char speed_array[4] = {0};
+    unsigned char missionEnd = 0;
+    unsigned char task;
+
+    double latitude;
+    double longitude;
+    float altitude;
+    float speedFactor;
+
+
+    int checkMissionEnd;
+   
+
 
     // Use this control flag (x-y ground frame is horizontal frame in ENU)
     uint8_t control_flag = (DJISDK::VERTICAL_VELOCITY| DJISDK::HORIZONTAL_VELOCITY|DJISDK::YAW_RATE |DJISDK::HORIZONTAL_GROUND |DJISDK::STABLE_ENABLE); 
