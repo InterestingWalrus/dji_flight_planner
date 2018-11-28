@@ -53,24 +53,24 @@ FlightPlanner::FlightPlanner()
 
  void FlightPlanner::returnHome()
  {
-
-    geometry_msgs::Vector3 offset_from_home;
-
-   ROS_INFO(" HOME Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
-
-   localOffsetFromGpsOffset(offset_from_home, home_gps_location, current_gps_location );
-   ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
-
-   // pass local offsets into global variable
-   home_target_offset_x = offset_from_home.x;
-   home_target_offset_y = offset_from_home.y;
-   home_target_offset_z = offset_from_home.z;
-
+   
     ROS_INFO("Returning home");
 
-    while(!homeReached)
+     geometry_msgs::Vector3 offset_from_home;
+
+    ROS_INFO(" HOME Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
+
+    localOffsetFromGpsOffset(offset_from_home, home_gps_location, current_gps_location );
+    ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+
+    // pass local offsets into global variable
+    home_target_offset_x = offset_from_home.x;
+    home_target_offset_y = offset_from_home.y;
+    home_target_offset_z = offset_from_home.z;
+
+    if(!homeReached)
     {
-        ROS_INFO("In STEP loop");
+        ROS_INFO_ONCE("In STEP loop");
         stepHome(current_gps_location, current_drone_attitude);
 
     }
@@ -297,18 +297,22 @@ void FlightPlanner::stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs:
   geometry_msgs::Vector3   localOffset;
 
 
-  float speedFactor         = 5;
+  float homeSpeed  = 5;
   float yawThresholdInDeg   = 2;
 
   float xCmd, yCmd, zCmd;
 
-  localOffsetFromGpsOffset(localOffset, current_gps, home_gps_location);
+  localOffsetFromGpsOffset(localOffset, current_gps, home_start_gps_location );
 
-  ROS_INFO("HOME OFFSET: %f , %f, %f", localOffset.x, localOffset.y, localOffset.z);
+  // ROS_INFO_THROTTLE(2, "Curr GPS %f %f", current_gps.latitude, current_gps.longitude);
+ // ROS_INFO_THROTTLE(3, "HOME OFFSET: %f , %f, %f", localOffset.x, localOffset.y, localOffset.z);
+  //ROS_INFO_THROTTLE(3, "HOME Waypoint target offset  x: %f y: %f z: %f ", home_target_offset_x, home_target_offset_y, home_target_offset_z);
 
   double xOffsetRemaining = home_target_offset_x - localOffset.x;
-  double yOffsetRemaining = home_target_offset_x - localOffset.y;
-  double zOffsetRemaining = home_target_offset_x - localOffset.z;
+  double yOffsetRemaining = home_target_offset_y - localOffset.y;
+  double zOffsetRemaining = home_target_offset_z - localOffset.z;
+
+ 
 
   double yawDesiredRad = Deg_To_Rad(target_yaw);
   double yawThresholdInRad = Deg_To_Rad(yawThresholdInDeg);
@@ -316,23 +320,25 @@ void FlightPlanner::stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs:
 
 
 info_counter++;
-  if(info_counter > 25)
+  if(info_counter > 50)
   {
     info_counter = 0;
+    ROS_INFO( "HOME OFFSET: %f , %f, %f", localOffset.x, localOffset.y, localOffset.z);
+     ROS_INFO("OFFSET LEFT  x: %f y: %f z: %f ", xOffsetRemaining, yOffsetRemaining, zOffsetRemaining);
   }
 
-    if (abs(xOffsetRemaining) >= speedFactor)
-        xCmd = (xOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    if (abs(xOffsetRemaining) >= homeSpeed)
+        xCmd = (xOffsetRemaining>0) ? homeSpeed : -1 * homeSpeed;
     else
         xCmd = xOffsetRemaining;
 
-    if (abs(yOffsetRemaining) >= speedFactor)
-        yCmd = (yOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    if (abs(yOffsetRemaining) >= homeSpeed)
+        yCmd = (yOffsetRemaining>0) ? homeSpeed : -1 * homeSpeed;
     else
         yCmd = yOffsetRemaining;
 
-    if (abs(zOffsetRemaining) >= speedFactor)
-    zCmd = (zOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
+    if (abs(zOffsetRemaining) >= homeSpeed)
+    zCmd = (zOffsetRemaining>0) ? homeSpeed : -1 * homeSpeed;
     else
     zCmd = zOffsetRemaining;
 
@@ -363,13 +369,24 @@ info_counter++;
         droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
 
     }
+
+// Reduce speed
+     if (std::abs(xOffsetRemaining) < 0.5 &&
+        std::abs(yOffsetRemaining) < 0.5 && 
+        std::abs(zOffsetRemaining) < 0.5 )
+        {
+            ROS_INFO_ONCE( "We are close to home.");
+            homeSpeed = 1;
+            
+        }
    
 
     if (std::abs(xOffsetRemaining) < 0.5 &&
         std::abs(yOffsetRemaining) < 0.5 && 
         std::abs(zOffsetRemaining) < 0.5 )
         {
-            ROS_INFO_ONCE( "We are close to home.");
+            ROS_INFO_ONCE( "We are very close to home.");
+           
              home_inbound_counter ++;
         }
 
@@ -424,11 +441,11 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
   // double yawDesiredRad      = atan2(yOffsetRemaining, xOffsetRemaining);
 
 info_counter++;
-  if(info_counter > 25)
+  if(info_counter > 100)
   {
     info_counter = 0;
-    //ROS_INFO( "-----x=%f, y=%f, z=%f, yaw=%f ...", localOffset.x,localOffset.y, localOffset.z,yawInRad);
-    //ROS_INFO( "+++++dx=%f, dy=%f, dz=%f, dyaw=%f ...", xOffsetRemaining,yOffsetRemaining, zOffsetRemaining,yawInRad - yawDesiredRad);
+   // ROS_INFO( "-----x=%f, y=%f, z=%f, yaw=%f ...", localOffset.x,localOffset.y, localOffset.z,yawInRad);
+   // ROS_INFO( "+++++dx=%f, dy=%f, dz=%f, dyaw=%f ...", xOffsetRemaining,yOffsetRemaining, zOffsetRemaining,yawInRad - yawDesiredRad);
 
     //ROS_INFO( "YAW in RAD: %f",yawInRad);
 
@@ -859,33 +876,70 @@ void FlightPlanner::runMission()
             case MissionState::FINISHED:
             {
 
-                ROS_INFO_ONCE("End of Mission");
+            //     ROS_INFO_ONCE("End of Mission");
+
+           
 
                 //flightControl.land(); // use this for now....
 
                 ros::Duration(0.5).sleep();
 
-                if (checkMissionEnd == 2)
+                switch(checkMissionEnd)
                 {
 
-                    returnHome() ;                    
-                    
-                    
+                     
+                    case 2:
+                    {
+
+                             ROS_INFO("Computing home offsets");
+                            geometry_msgs::Vector3 offset_from_home;
+                             ROS_INFO(" HOME Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
+                            localOffsetFromGpsOffset(offset_from_home, home_gps_location, current_gps_location );
+                             ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+                            // pass local offsets into global variable
+                            home_target_offset_x = offset_from_home.x;
+                             home_target_offset_y = offset_from_home.y;
+                             home_target_offset_z = offset_from_home.z;
+                             home_start_gps_location = current_gps_location;
+
+                             
+
+                        
+                       state = MissionState::GO_HOME;
+                      break;
+                    }
+
+
+                    case 3:
+                    {
+                        flightControl.M100monitoredLanding();
+                        break;
+                    }
+
+                    default:
+                    {
+                          state = MissionState::IDLE;   
+                         break;
+
+                    }
+                   
+
                 }
 
-                else if (checkMissionEnd == 3)
-                {
-                    flightControl.M100monitoredLanding();
-                }
-            
-                else
-                {
-                        state = MissionState::IDLE;          
+            }
 
-                }
-    
-                
-                    break;
+            case MissionState::GO_HOME:
+            {
+
+               if(!homeReached)
+               {
+
+                    stepHome(current_gps_location, current_drone_attitude);
+                   
+               }
+
+
+                break;
 
             }
 

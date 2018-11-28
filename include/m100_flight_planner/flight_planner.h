@@ -45,7 +45,8 @@ enum MissionState
     IDLE = 0,
     NEW_WAYPOINT = 1,
     ARRIVED = 2,
-    FINISHED = 3    
+    FINISHED = 3,
+    GO_HOME = 4    
 
 };
 
@@ -128,6 +129,8 @@ class FlightPlanner
     geometry_msgs::Point start_local_position;
 
     sensor_msgs::NavSatFix current_gps_location;
+
+    sensor_msgs::NavSatFix home_start_gps_location;
 
     sensor_msgs::NavSatFix home_gps_location;
     geometry_msgs::Point current_local_position;
