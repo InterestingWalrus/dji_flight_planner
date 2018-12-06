@@ -3,10 +3,10 @@
 FlightPlanner::FlightPlanner()
 {
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
-    //gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
-    gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);
-   // local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
-    local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this);
+    gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+    //gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);
+    local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
+   // local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this);
     attitude_sub = nh.subscribe("/dji_sdk/attitude", 10, &FlightPlanner::attitude_callback, this);
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
