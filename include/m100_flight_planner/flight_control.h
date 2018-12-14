@@ -91,7 +91,7 @@ class FlightControl
     sensor_msgs::NavSatFix current_gps; 
     
     uint8_t gps_health;
-    float takeoff_height;
+    float height_above_takeoff;
    
 
 

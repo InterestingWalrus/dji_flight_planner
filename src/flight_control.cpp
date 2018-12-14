@@ -139,7 +139,7 @@ bool FlightControl::obtainControl()
 
 void FlightControl::height_callback(const std_msgs::Float32::ConstPtr& msg)
 {
-    takeoff_height = msg->data;
+    height_above_takeoff = msg->data;
 
 }
 
@@ -338,7 +338,7 @@ bool FlightControl::M100monitoredTakeoff()
 {
   ros::Time start_time = ros::Time::now();
 
-  float home_altitude = current_gps.altitude;
+  float home_takeoff = height_above_takeoff;
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF))
   {
     ROS_INFO("Did this fail?:");
@@ -357,12 +357,38 @@ bool FlightControl::M100monitoredTakeoff()
 
   
 
-  if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR ||
-      current_gps.altitude - home_altitude < 1.0)
+  if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR || height_above_takeoff - home_takeoff < 1.0)
   {
-    ROS_INFO("Home Alt: %f",  home_altitude);
-    ROS_INFO("Current Alt: %f", current_gps.altitude);
+    ROS_INFO("Home Takeoff point: %f", home_takeoff);
+    ROS_INFO("Current Height above takeoff position: %f", home_takeoff);
+    ROS_INFO ("Difference: %f m",  height_above_takeoff - home_takeoff);
+  
+    if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_FINISHED_LANDING)
+    {
+      ROS_ERROR ("Flight status: Drone Finished Landing");
+
+    }
+
+    if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_LANDING)
+    {
+      ROS_ERROR ("Flight status: Drone Landing");
+
+    }
+
+    if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_ON_GROUND)
+    {
+      ROS_ERROR ("Flight status: Drone still on the ground");
+
+    }
+
+    if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_TAKINGOFF)
+    {
+      ROS_ERROR ("Flight status: Drone Taking off");
+
+    }
+
     ROS_ERROR("Takeoff failed.");
+
     return false;
   }
   else
@@ -385,11 +411,9 @@ float FlightControl::computeTimeToLand()
 
 
 
-  float current_height = takeoff_height;
+  float current_height = height_above_takeoff;
 
   float timeToLand = (current_height / droneLandSpeed) ;
-
-  
 
   // Maximum time drone will take to land from an altitude of 100 metres is 55 seconds.. 
   // Tested in simulator
