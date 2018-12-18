@@ -92,6 +92,8 @@ class FlightPlanner
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 
+       
+
 
     
    
@@ -158,7 +160,6 @@ class FlightPlanner
     double longitude;
     float altitude;
     float speedFactor;
-
 
     int checkMissionEnd;
    

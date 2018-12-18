@@ -62,6 +62,8 @@ class FlightControl
         bool takeoff_land(int task);
         bool set_local_position();
 
+
+
         float computeTimeToLand(); // based on a 1 m/s descent speed
        
 
@@ -85,11 +87,8 @@ class FlightControl
 
     uint8_t flight_status = 255;
     uint8_t display_mode  = 255;
-    
-
-    
+        
     sensor_msgs::NavSatFix current_gps; 
-    
     uint8_t gps_health;
     float height_above_takeoff;
    

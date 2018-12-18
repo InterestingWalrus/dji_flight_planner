@@ -337,7 +337,7 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
 bool FlightControl::M100monitoredTakeoff()
 {
   ros::Time start_time = ros::Time::now();
-
+  
   float home_takeoff = height_above_takeoff;
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF))
   {
@@ -348,8 +348,8 @@ bool FlightControl::M100monitoredTakeoff()
   ros::Duration(7).sleep();
   ros::spinOnce();
 
-  // Step 1: If M100 is not in the air after 10 seconds, fail.
-  while (ros::Time::now() - start_time < ros::Duration(10))
+  // Step 1: If M100 is not in the air after 15 seconds, fail.
+  while (ros::Time::now() - start_time < ros::Duration(15))
   {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
@@ -359,9 +359,7 @@ bool FlightControl::M100monitoredTakeoff()
 
   if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR || height_above_takeoff - home_takeoff < 1.0)
   {
-    ROS_INFO("Home Takeoff point: %f", home_takeoff);
-    ROS_INFO("Current Height above takeoff position: %f", home_takeoff);
-    ROS_INFO ("Difference: %f m",  height_above_takeoff - home_takeoff);
+   
   
     if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_FINISHED_LANDING)
     {
@@ -386,6 +384,10 @@ bool FlightControl::M100monitoredTakeoff()
       ROS_ERROR ("Flight status: Drone Taking off");
 
     }
+
+    ROS_INFO("Home Takeoff point: %f", home_takeoff);
+    ROS_INFO("Current Height above takeoff position: %f", home_takeoff);
+    ROS_INFO ("Difference: %f m",  height_above_takeoff - home_takeoff);
 
     ROS_ERROR("Takeoff failed.");
 
