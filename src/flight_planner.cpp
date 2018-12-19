@@ -155,7 +155,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
                 case 2: //Return Home
                 checkMissionEnd = 3;
-                 std::cout << "FIRST WAYPOINT ACTION" << std::endl;
+                 std::cout << "RETURN HOME" << std::endl;
 
                 break;
 
@@ -860,7 +860,7 @@ void FlightPlanner::runMission()
                 {
 
                      
-                    case 2:
+                    case 3:
                     {
 
                              ROS_INFO("Computing home offsets");
@@ -882,7 +882,7 @@ void FlightPlanner::runMission()
                     }
 
 
-                    case 3:
+                    case 2:
                     {
                         flightControl.M100monitoredLanding();
                         break;
