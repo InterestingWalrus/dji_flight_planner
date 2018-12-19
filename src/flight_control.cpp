@@ -357,7 +357,7 @@ bool FlightControl::M100monitoredTakeoff()
 
   
 
-  if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR || height_above_takeoff - home_takeoff < 1.0)
+  if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR || height_above_takeoff - home_takeoff < 0.6)
   {
    
   
