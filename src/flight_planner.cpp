@@ -885,6 +885,7 @@ void FlightPlanner::runMission()
                     case 2:
                     {
                         flightControl.M100monitoredLanding();
+                        state = MissionState::IDLE;   
                         break;
                     }
 
