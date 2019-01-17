@@ -43,11 +43,11 @@ class FlightControl
 {
     public:
         FlightControl();
-        void activate(); //
-        void takeOff(); //
+        void activate(); // Activate the drone for SDK control
+        void takeOff(); //  un-monitored takeoff
         void land(); //
-        void goHome();
-        bool monitoredTakeoff(); 
+        void goHome(); // drone flies back home. This function uses the TASK_GO_HOME flag from the sdk. 
+        bool monitoredTakeoff();  // 
         bool monitoredLanding();
         bool obtainControl();
         bool releaseControl();

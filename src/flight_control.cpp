@@ -13,7 +13,7 @@ FlightControl::FlightControl()
    
 
    gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
-  // gps_sub = nh.subscribe("gps/filtered", 10, &FlightControl::gps_callback, this);
+  // gps_sub = nh.subscribe("gps/filtered", 10, &FlightControl::gps_callback, this);        // For EKF control tetsing
    gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
    flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
     height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
@@ -36,7 +36,6 @@ void FlightControl::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
   current_gps.latitude = msg->latitude;
   current_gps.longitude = msg->longitude;
   current_gps.altitude = msg->altitude;
-  //ROS_INFO_THROTTLE (0.1, "GPS: %f: ", current_gps.altitude);
 }
  
 void FlightControl::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
@@ -44,6 +43,7 @@ void FlightControl::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
   gps_health = msg->data;
   ROS_INFO_ONCE ("GPS Health: %i", gps_health);
 }
+
 void FlightControl::activate()
 {
    dji_sdk::Activation activation;
@@ -51,7 +51,7 @@ void FlightControl::activate()
    
    if(!activation.response.result)
    {
-       ROS_ERROR("Drone app not activated. Please check your app key");
+       ROS_ERROR("Drone control program not activated. Please check your app key");
    }
 
    else
@@ -61,6 +61,9 @@ void FlightControl::activate()
 
 }
 
+
+
+// checks if drone is Matrice M100.
 bool FlightControl::check_M100()
 {
 
@@ -257,10 +260,13 @@ bool FlightControl::monitoredTakeoff()
 
 }
 
+// FOR DJI A3/N3
+// Untested.
 bool FlightControl::monitoredLanding() // WOrk on this later......
 {
-
-      ros::Time start_time = ros::Time::now();
+  
+  float rosTime_to_land = computeTimeToLand() + 5;
+  ros::Time start_time = ros::Time::now();
 
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND)) {
     return false;
@@ -272,12 +278,12 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
   // Step 1.1: landDrone
   while (flight_status != DJISDK::FlightStatus::STATUS_ON_GROUND &&
          display_mode != DJISDK::DisplayMode::MODE_AUTO_LANDING &&
-         ros::Time::now() - start_time < ros::Duration(5)) {
+         ros::Time::now() - start_time < ros::Duration(rosTime_to_land)) {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
   }
 
-  if(ros::Time::now() - start_time > ros::Duration(5)) {
+  if(ros::Time::now() - start_time > ros::Duration(rosTime_to_land)) {
     ROS_ERROR("Landing Failed");
     return false;
   }
@@ -287,40 +293,21 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
     ros::spinOnce();
   }
 
-
-  // Step 1.2: Get drone to land
-  while (flight_status != DJISDK::FlightStatus::STATUS_ON_GROUND &&
-          (display_mode != DJISDK::DisplayMode::MODE_AUTO_LANDING ) &&
-          ros::Time::now() - start_time < ros::Duration(20)) {
-    ros::Duration(0.01).sleep();
-    ros::spinOnce();
-  }
-
-  if(ros::Time::now() - start_time > ros::Duration(20)) {
-    ROS_ERROR("Landing failed. Aircraft not landed yet");
-    return false;
-  }
-  else {
-    start_time = ros::Time::now();
-    ROS_INFO("Ascending...");
-    ros::spinOnce();
-  }
-
-  // Final check: Finished takeoff
+  // Final check: Finished Landing
   while ((display_mode == DJISDK::DisplayMode::MODE_AUTO_LANDING) &&
-          ros::Time::now() - start_time < ros::Duration(20)) {
+          ros::Time::now() - start_time < ros::Duration(rosTime_to_land)) {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
   }
 
-  if ( display_mode != DJISDK::DisplayMode::MODE_P_GPS || display_mode != DJISDK::DisplayMode::MODE_ATTITUDE)
+  if (display_mode != DJISDK::DisplayMode::MODE_P_GPS || display_mode != DJISDK::DisplayMode::MODE_ATTITUDE)
   {
-    ROS_INFO("Successful takeoff!");
+    ROS_INFO("Successful Landing!");
     start_time = ros::Time::now();
   }
   else
   {
-    ROS_ERROR("Takeoff finished, but the aircraft is in an unexpected mode. Please connect DJI GO.");
+    ROS_ERROR("Landing finished, but the aircraft is in an unexpected mode. Please connect DJI GO.");
     return false;
   }
 
@@ -403,8 +390,6 @@ bool FlightControl::M100monitoredTakeoff()
   return true;
 }
 
-
-
 // returns the time required for the drone to land. 
 float FlightControl::computeTimeToLand()
 {
@@ -470,10 +455,11 @@ bool FlightControl::M100monitoredLanding()
   return true; 
 }
 
-
 bool FlightControl::set_local_position()
 {
   dji_sdk::SetLocalPosRef localPosReferenceSetter;
   set_local_pos_reference.call(localPosReferenceSetter);
   return localPosReferenceSetter.response.result;
 }
+
+//TODO TAke off bug for when the drone takes off again after landing at a waypoint.

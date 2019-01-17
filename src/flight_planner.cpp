@@ -4,9 +4,9 @@ FlightPlanner::FlightPlanner()
 {
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
     gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
-    //gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);
+    //gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);  // for EKF control testing
     local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
-   // local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this);
+   // local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this); // For EKF control testing
     attitude_sub = nh.subscribe("/dji_sdk/attitude", 10, &FlightPlanner::attitude_callback, this);
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
@@ -24,6 +24,8 @@ FlightPlanner::FlightPlanner()
             ROS_INFO("Local Position set successfully! ");
         }
     }
+
+   // set initial parameters. 
 
     state = MissionState::IDLE;
     waypoint_finished = false;
@@ -45,8 +47,7 @@ FlightPlanner::FlightPlanner()
     altitude_array[4] = {0};
     task = 0;
     speed_array[4] = {0};
-    missionEnd = 0;
-   
+    missionEnd = 0; 
     
 }
 
@@ -69,17 +70,14 @@ FlightPlanner::FlightPlanner()
 
     if(!homeReached)
     {
-        ROS_INFO_ONCE("In STEP loop");
+        ROS_INFO_ONCE("On the way back home");
         stepHome(current_gps_location, current_drone_attitude);
 
-    }
-  
-
+    }  
 }
 
 void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data)
 {
-
     data_from_mobile = *mobile_data;
     unsigned char data;
     memcpy(&data, &data_from_mobile.data[0], 10);
@@ -124,7 +122,8 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             std::memcpy(&altitude, altitude_array, sizeof(float));
 
 
-            std::cout<< "TASK:" << static_cast<unsigned>(task) << std::endl;
+            std::cout<< "Landing at Waypoint:" << static_cast<unsigned>(task) << std::endl;
+            // Add waypoint to flight plan
             prepareFlightPlan(latitude, longitude, altitude, task);
 
            break;
@@ -169,7 +168,6 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             }
 
             std::cout << std::fixed << speedFactor << "m/s" << std::endl;
-            std::cout << static_cast<unsigned>(missionEnd) << std::endl;
             break;
        }
 
@@ -184,8 +182,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
                ROS_INFO("Waypoints cleared, Aircraft now in IDLE State");
 
-           break;
-          
+           break;        
        }
 
        case 0x03:
@@ -206,7 +203,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
        {
 
            ROS_INFO("Aborting mission: Going home");
-            returnHome();
+           returnHome();
            break;
        }
 
@@ -215,28 +212,31 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             ros::Rate loop_rate(50);
             // SET HOME GPS LOCATION here.
             home_gps_location = current_gps_location;      
-            home_gps_location.altitude = 3.0;
-            ROS_INFO("Logged home GPS location at Lat:%f  , Lon:%f  , Lon:%f ", home_gps_location.latitude, home_gps_location.longitude, home_start_gps_location.altitude);
+
+            ROS_INFO("Logged home GPS location at Lat:%f  , Lon:%f  , Alt:%f ", home_gps_location.latitude, home_gps_location.longitude, home_start_gps_location.altitude);
           
+             
+            // Set Home GPS Altitude as a 5 metre offset from the current take off altitude of the drone
+            home_gps_location.altitude = current_gps_location.altitude +  5.0;
+            ROS_INFO("Logged home return GPS Altitude :%f ", home_start_gps_location.altitude);
+
             if(flightControl.check_M100())
                 {
                     ROS_INFO("M100 Drone taking off");
-                    takeoff_result = flightControl.M100monitoredTakeoff();
-                
-
+                    takeoff_result = flightControl.M100monitoredTakeoff();        
                 }
                 else
                 {
 
-                    // Drone is an A3/N3 variant
+                    // iF Drone is an A3/N3 variant
                     ROS_INFO("Custom Drone taking off");
                     takeoff_result = flightControl.monitoredTakeoff();
-
                 }
 
                 if(takeoff_result)
                 {
 
+                    // set first gps position
                     start_gps_location = current_gps_location;
                     start_local_position = current_local_position;
                                 
@@ -246,6 +246,8 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                     while(ros::ok())
                     {
                         ros::spinOnce();
+
+                        // start mission here
                         runMission();
 
                         loop_rate.sleep();
@@ -279,6 +281,7 @@ FlightPlanner::~FlightPlanner()
     }
 }
 
+// return home function here.
 void FlightPlanner::stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti)
 {
 
@@ -286,8 +289,9 @@ void FlightPlanner::stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs:
   geometry_msgs::Vector3   localOffset;
 
 
-  float homeSpeed  = 5;
-  float yawThresholdInDeg   = 2;
+  // set return home speed to the speed at which the mission was run.
+  float homeSpeed = speedFactor ;
+  float yawThresholdInDeg  = 2;
 
   float xCmd, yCmd, zCmd;
 
@@ -397,44 +401,28 @@ info_counter++;
         home_break_counter = 1;
     }
 
-
-
 }
 
+// step between missions
 void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti)
 {
-  static int info_counter = 0;
-  geometry_msgs::Vector3     localOffset;
+    static int info_counter = 0;
+    geometry_msgs::Vector3     localOffset;
 
-  float yawThresholdInDeg   = 2;
+    float yawThresholdInDeg   = 2;
 
-  float xCmd, yCmd, zCmd;
+    float xCmd, yCmd, zCmd;
 
-  localOffsetFromGpsOffset(localOffset, current_gps, start_gps_location);
+    localOffsetFromGpsOffset(localOffset, current_gps, start_gps_location);
 
-  double xOffsetRemaining = target_offset_x - localOffset.x;
-  double yOffsetRemaining = target_offset_y - localOffset.y;
-  double zOffsetRemaining = target_offset_z - localOffset.z;
+    double xOffsetRemaining = target_offset_x - localOffset.x;
+    double yOffsetRemaining = target_offset_y - localOffset.y;
+    double zOffsetRemaining = target_offset_z - localOffset.z;
 
-  double yawDesiredRad = Deg_To_Rad(target_yaw);
-  double yawThresholdInRad = Deg_To_Rad(yawThresholdInDeg);
-  double yawInRad          = toEulerAngle(current_atti).z;
+    double yawDesiredRad = Deg_To_Rad(target_yaw);
+    double yawThresholdInRad = Deg_To_Rad(yawThresholdInDeg);
+    double yawInRad          = toEulerAngle(current_atti).z;
   
-  // double yawDesiredRad      = atan2(yOffsetRemaining, xOffsetRemaining);
-
-info_counter++;
-  if(info_counter > 100)
-  {
-    info_counter = 0;
-   // ROS_INFO( "-----x=%f, y=%f, z=%f, yaw=%f ...", localOffset.x,localOffset.y, localOffset.z,yawInRad);
-   // ROS_INFO( "+++++dx=%f, dy=%f, dz=%f, dyaw=%f ...", xOffsetRemaining,yOffsetRemaining, zOffsetRemaining,yawInRad - yawDesiredRad);
-
-    //ROS_INFO( "YAW in RAD: %f",yawInRad);
-
-   // ROS_INFO( "YAW DESIRED RAD: % f", yawDesiredRad);
-    //ROS_INFO( "inbound_counter %d", inbound_counter );
-  }
-
     if (abs(xOffsetRemaining) >= speedFactor)
         xCmd = (xOffsetRemaining>0) ? speedFactor : -1 * speedFactor;
     else
@@ -450,12 +438,10 @@ info_counter++;
     else
     zCmd = zOffsetRemaining;
 
-    //zCmd = start_local_position.z + target_offset_z;
-
     /*!
-   * @brief: if we already started breaking, keep break for 50 sample (1sec)
-   *         and call it done, else we send normal command
-   */
+    * @brief: if we already started breaking, keep break for 50 sample (1sec)
+    *         and call it done, else we send normal command
+    */
     if (break_counter > 50)
     {
         ROS_INFO("##### Route %d finished....", waypoint_index + 1);
@@ -467,22 +453,12 @@ info_counter++;
     {
         ROS_INFO_ONCE("Incrementing Break Counter");
         droneControlSignal(0,0,0,0);
-       // droneControlSignalPID(0, 0, 0, 0);
         break_counter++;
         return;
     }
-    else //break_counter = 0, not in break stage
+    else 
     {
-        // How do you align the yawing??
-        // if(std::abs(xOffsetRemaining) < speedFactor || std::abs(yOffsetRemaining < speedFactor) || std::abs(yawDesiredRad - yawInRad)< yawThresholdInRad)
-        // {
-        //     // don't yaw the drone
-        //     droneControlSignal(xCmd, yCmd, zCmd, 0, true, true);
-        // }
-
         droneControlSignal(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
-        //droneControlSignalPID(xCmd, yCmd, zCmd, yawDesiredRad, true, true);
-
     }
 
     if (std::abs(xOffsetRemaining) < 0.5 &&
@@ -490,14 +466,13 @@ info_counter++;
         std::abs(zOffsetRemaining) < 0.5 )
         {
             //! 1. We are within bounds; start incrementing our in-bound counter
-            //ROS_INFO_THROTTLE(1, "We are close.");
             ROS_INFO_ONCE( "We are close.");
-             inbound_counter ++;
+                inbound_counter ++;
         }
 
     else
     {
-       if (inbound_counter != 0)
+        if (inbound_counter != 0)
         {
             //! 2. Start incrementing an out-of-bounds counter
             outbound_counter ++;
@@ -586,10 +561,11 @@ void FlightPlanner::droneControlSignal(double x, double y, double z, double yaw,
     }
 
     control_pub.publish(controlPosYaw);
-
 }
 
-
+// This is very unstable and the implementation is probably incorrect so disregard this.
+// Looking to use some sort of Model predictive control next.
+// Need control knowledge gains
 void FlightPlanner::droneControlSignalPID(double x, double y, double z, double yaw, bool use_yaw_rate , bool use_ground_frame )
 {
 
@@ -634,8 +610,6 @@ void FlightPlanner::setWaypoint(sensor_msgs::NavSatFix newWaypoint)
 
     geometry_msgs::Vector3 offset_from_target;
 
-   // get GPS offset
-
    ROS_INFO("Waypoint COORDINATES #%d : %f  %f  %f", waypoint_index + 1, flight_plan[waypoint_index].latitude, flight_plan[waypoint_index].longitude, flight_plan[waypoint_index].altitude );
 
    localOffsetFromGpsOffset(offset_from_target, newWaypoint, start_gps_location );
@@ -645,7 +619,6 @@ void FlightPlanner::setWaypoint(sensor_msgs::NavSatFix newWaypoint)
    target_offset_x = offset_from_target.x;
    target_offset_y = offset_from_target.y;
    target_offset_z = offset_from_target.z;
-
 
 }
 
@@ -668,13 +641,13 @@ bool FlightPlanner::reachedWaypoint()
 void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land)
 {
 
-  // add new waypoint to vector
+    // add new waypoint to vector
     flight_plan.push_back(newWaypoint);
 
     // update number of waypoints
     waypoint_count = flight_plan.size();
 
-    flight_plan_1.push(make_pair(flight_plan, land));
+    waypoint_lists.push(make_pair(flight_plan, land));
 
     ROS_INFO("Waypoint # %d added", waypoint_count);
 
@@ -684,11 +657,11 @@ void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigne
 
 void FlightPlanner::onWaypointReached()
 { 
-    unsigned char checkTask = flight_plan_1.front().second;
+    // check if we are to land at the waypoint. 
+    unsigned char checkTask = waypoint_lists.front().second;
     
-    if(!flight_plan_1.empty())
-    {
-   
+    if(!waypoint_lists.empty())
+    {   
         if(checkTask == 1)  
         {
             bool performTask;
@@ -705,16 +678,16 @@ void FlightPlanner::onWaypointReached()
             {
                 //performTask = flightControl.monitoredLanding();
                 // This doesn't work on S1000 for now.
+                // TODO: Would need to do some checks here to 
                 flightControl.land();
             }
-            
 
             if(performTask)
             {
                 // Pause for a period of time here...
+                // Integrate whatever task we're doing at this point.
                 ros::Duration(10).sleep();
-
-                flightControl.monitoredTakeoff();
+                flightControl.M100monitoredTakeoff();
             }
 
             else
@@ -726,7 +699,9 @@ void FlightPlanner::onWaypointReached()
     }
 
     waypoint_index++;
-    flight_plan_1.pop();
+
+    // remove current waypoint from the list
+    waypoint_lists.pop();
 
     state = MissionState::ARRIVED;
 }
@@ -749,8 +724,6 @@ void FlightPlanner::localOffsetFromGpsOffset(geometry_msgs::Vector3& deltaENU, s
         deltaENU.y = Deg_To_Rad(deltaLat) * C_EARTH;
         deltaENU.x = Deg_To_Rad(deltaLon) * C_EARTH * cos(Deg_To_Rad(target.latitude));
         deltaENU.z = target.altitude - origin.altitude ;
-
-     //        ROS_INFO_THROTTLE(2, "Z Altitude = %f", deltaENU.z);
 
 }
 
@@ -797,8 +770,7 @@ void FlightPlanner::runMission()
 
             case MissionState::NEW_WAYPOINT:
             {   
-                // if if mission isn't finished, keep stepping through mission.
-               // ROS_INFO("Waypoint index MISSION NEW: %d", waypoint_index);
+                // if  mission isn't finished, keep stepping through mission.
                 if(!reachedWaypoint())
                 {
                     step(current_gps_location, current_drone_attitude);
@@ -819,8 +791,6 @@ void FlightPlanner::runMission()
                 {
 
                     // TODO........Add mission tasks here
-
-
                     // if mission isn't finished, reset gps and local position to current position and continue mission.
 
                     inbound_counter = 0;
@@ -847,13 +817,6 @@ void FlightPlanner::runMission()
 
             case MissionState::FINISHED:
             {
-
-            //     ROS_INFO_ONCE("End of Mission");
-
-           
-
-                //flightControl.land(); // use this for now....
-
                 ros::Duration(0.5).sleep();
 
                 switch(checkMissionEnd)
@@ -863,24 +826,21 @@ void FlightPlanner::runMission()
                     case 3:
                     {
 
-                             ROS_INFO("Computing home offsets");
-                            geometry_msgs::Vector3 offset_from_home;
-                             ROS_INFO(" HOME Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
-                            localOffsetFromGpsOffset(offset_from_home, home_gps_location, current_gps_location );
-                             ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
-                            // pass local offsets into global variable
-                            home_target_offset_x = offset_from_home.x;
-                             home_target_offset_y = offset_from_home.y;
-                             home_target_offset_z = offset_from_home.z;
-                             home_start_gps_location = current_gps_location;
+                        ROS_INFO("Computing home offsets");
+                        geometry_msgs::Vector3 offset_from_home;
+                        ROS_INFO(" HOME Waypoint COORDINATES :  %f ,  %f, %f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude );
+                         localOffsetFromGpsOffset(offset_from_home, home_gps_location, current_gps_location );
+                        ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+                    
+                        home_target_offset_x = offset_from_home.x;
+                        home_target_offset_y = offset_from_home.y;
+                        home_target_offset_z = offset_from_home.z;
+                        // Set Starting point here.
 
-                             
-
-                        
-                       state = MissionState::GO_HOME;
+                        home_start_gps_location = current_gps_location;                     
+                        state = MissionState::GO_HOME;
                       break;
                     }
-
 
                     case 2:
                     {
@@ -897,12 +857,10 @@ void FlightPlanner::runMission()
 
                     default:
                     {
-                          state = MissionState::IDLE;   
+                         state = MissionState::IDLE;   
                          break;
 
                     }
-                   
-
                 }
 
             }
@@ -916,8 +874,6 @@ void FlightPlanner::runMission()
                     stepHome(current_gps_location, current_drone_attitude);
                    
                }
-
-
                 break;
 
             }
@@ -974,7 +930,6 @@ int main(int argc, char** argv)
      FlightPlanner flight_planner;
 
      ROS_INFO("Running");
-
 
     ros::spin();
 

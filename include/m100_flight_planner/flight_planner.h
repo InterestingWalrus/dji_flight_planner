@@ -20,7 +20,6 @@
 #include <sensor_msgs/Joy.h>
 #include "dji_sdk/dji_sdk.h"
 
-#include "m100_flight_planner/flight_state.h"
 #include "m100_flight_planner/flight_control.h"
 #include "m100_flight_planner/mobile_comm.h"
 #include "m100_flight_planner/PID.h"
@@ -62,8 +61,13 @@ class FlightPlanner
     public:
         FlightPlanner();
         ~FlightPlanner();
-        void setWaypoint(sensor_msgs::NavSatFix newWaypoint);
+
+
+        void setWaypoint(sensor_msgs::NavSatFix newWaypoint); 
+
+        // current_atti is used to set yaw_angle for drone. Currently not needed. 
         void step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
+
         void reset(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Point &current_local_pos);
 
         void stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
@@ -99,56 +103,60 @@ class FlightPlanner
    
     private:
 
-    int state;
+    int state; // drone state
     int waypoint_index;
     int waypoint_count;
+
+    // counters for mission and home step functions
     int outbound_counter;
     int inbound_counter;
+    int break_counter;
 
     int home_inbound_counter ;
     int home_outbound_counter;
     int home_break_counter ;
-
-
-    int state_1;
-    int break_counter;
    
-
+    // get data from the android device 
     dji_sdk::MobileData data_from_mobile;
     unsigned char data_to_mobile[10];
 
+
+     // calculate position offsets between waypoints
     float target_offset_x;
     float target_offset_y;
     float target_offset_z;
     float target_yaw;
 
-
+    // calculate position offsets between current position and home point.
     float home_target_offset_x;
     float home_target_offset_y;
     float home_target_offset_z;
 
+
+   // drone takeoff absolute and local positions
     sensor_msgs::NavSatFix start_gps_location;
     geometry_msgs::Point start_local_position;
 
-    sensor_msgs::NavSatFix current_gps_location;
 
+    sensor_msgs::NavSatFix current_gps_location;
     sensor_msgs::NavSatFix home_start_gps_location;
 
     sensor_msgs::NavSatFix home_gps_location;
     geometry_msgs::Point current_local_position;
     geometry_msgs::Quaternion current_drone_attitude;
 
+   // flight plan to store waypoints for missions
     std::vector<sensor_msgs::NavSatFix> flight_plan;
 
-    std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > flight_plan_1;
-
-    
+   // check if landing is required at the waypoint
+    std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > waypoint_lists;
 
     bool waypoint_finished;
     bool obtain_control;
     bool takeoff_result;
     bool homeReached;
 
+    // convert data from the mobile device to waypoint and mission parameters
     unsigned char latitude_array[8] = {0};
     unsigned char longitude_array[8] = {0};
     unsigned char altitude_array[4] = {0};
@@ -188,17 +196,6 @@ class FlightPlanner
     ros::Subscriber gps_sub;
     ros::Subscriber local_position_sub;
     ros::Subscriber mobile_data_subscriber;
-
-
-    double sampleX;
-    double sampleY;
-
-    
-
-
-
-
-
     
 
 };
