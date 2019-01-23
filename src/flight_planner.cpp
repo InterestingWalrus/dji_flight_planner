@@ -1,5 +1,60 @@
 #include "m100_flight_planner/flight_planner.h"
 
+char getch()
+{
+     int flags = fcntl(0, F_GETFL, 0);
+    fcntl(0, F_SETFL, flags | O_NONBLOCK);
+
+    char buf = 0;
+    struct termios old = {0};
+    if (tcgetattr(0, &old) < 0) {
+        perror("tcsetattr()");
+    }
+    old.c_lflag &= ~ICANON;
+    old.c_lflag &= ~ECHO;
+    old.c_cc[VMIN] = 1;
+    old.c_cc[VTIME] = 0;
+    if (tcsetattr(0, TCSANOW, &old) < 0) {
+        perror("tcsetattr ICANON");
+    }
+    if (read(0, &buf, 1) < 0) {
+        //perror ("read()");
+    }
+    old.c_lflag |= ICANON;
+    old.c_lflag |= ECHO;
+    if (tcsetattr(0, TCSADRAIN, &old) < 0) {
+        perror ("tcsetattr ~ICANON");
+    }
+    return (buf);
+}
+
+void FlightPlanner::keyboardControl()
+{
+    char c = getch();
+    
+    //ROS_INFO("The %d key was pressed", c);
+
+    if(c!=EOF)
+    {
+       switch(c)
+       {
+           case '\e':
+           {
+               ROS_ERROR("Drone Emergency stop");
+              droneControlSignal(0,0,0,0);  
+              break; 
+           }
+
+           case 'c':
+           {
+               runMission();
+               break;
+           }
+       }
+    }
+
+}
+
 FlightPlanner::FlightPlanner()
 {
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
@@ -48,6 +103,7 @@ FlightPlanner::FlightPlanner()
     task = 0;
     speed_array[4] = {0};
     missionEnd = 0; 
+   
     
 }
 
@@ -202,8 +258,9 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
        case 0x02:
        {
 
-           ROS_INFO("Aborting mission: Going home");
-           returnHome();
+           ROS_INFO("Aborting mission: Landing");
+           hover_flag = 1;
+           //flightControl.land();
            break;
        }
 
@@ -240,21 +297,27 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                     start_gps_location = current_gps_location;
                     start_local_position = current_local_position;
                                 
+                    
+                    ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
+                   
+                    std::cin.clear();
+                    std::cin >> command;
 
-                    ROS_INFO("Initiating mission");
+                    std::cout << "command: " << command << std::endl;
 
-                    while(ros::ok())
-                    {
-                        ros::spinOnce();
-
-                        // start mission here
-                        runMission();
-
-                        loop_rate.sleep();
-                    }
-
+                        while(ros::ok() && command == "c")
+                        {
+                            ros::spinOnce();                      
+                        
+                           runMission();                         
+                        
+                            loop_rate.sleep();
+                        
+                        }
 
                 }
+
+                break;
         }
 
             default:
@@ -347,7 +410,7 @@ info_counter++;
     else if (home_break_counter > 0)
     {
         ROS_INFO_ONCE("Incrementing Break Counter for Home");
-        droneControlSignal(0,0,0,0);
+        droneControlSignal(0,0,0,0, true, true);
         home_break_counter++;
         return;
     }
@@ -406,6 +469,7 @@ info_counter++;
 // step between missions
 void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti)
 {
+
     static int info_counter = 0;
     geometry_msgs::Vector3     localOffset;
 
@@ -449,6 +513,7 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
         return;
     }
 
+
     else if (break_counter > 0)
     {
         ROS_INFO_ONCE("Incrementing Break Counter");
@@ -477,6 +542,13 @@ void FlightPlanner::step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Qua
             //! 2. Start incrementing an out-of-bounds counter
             outbound_counter ++;
         }
+    }
+
+    if(hover_flag == 1)
+    {
+        ROS_INFO("Drone Stop");
+        droneControlSignal(0,0,0,0);
+
     }
 
     //! 3. Reset withinBoundsCounter if necessary
@@ -892,6 +964,8 @@ void FlightPlanner::runMission()
 void FlightPlanner::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 {
   current_gps_location = *msg;
+
+   //keyboardControl();
   
 
   ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);

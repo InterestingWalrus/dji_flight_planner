@@ -96,6 +96,10 @@ class FlightPlanner
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 
+
+        void keyboardControl();
+
+
        
 
 
@@ -164,12 +168,18 @@ class FlightPlanner
     unsigned char missionEnd = 0;
     unsigned char task;
 
+
+    int hover_flag;
+    
+
     double latitude;
     double longitude;
     float altitude;
     float speedFactor;
 
     int checkMissionEnd;
+
+     std::string command;
    
 
 
