@@ -264,6 +264,22 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
            break;
        }
 
+       case 0x5d:
+       {
+           ROS_INFO("continuing mission");
+           hover_flag = 0;
+           break;
+
+       }
+
+       // pause mission:
+       case 0x5f:
+       {
+           ROS_INFO("Pausing Mission");
+          hover_flag = 1;
+          break;
+       }
+
        case 0x1A:
        {
             ros::Rate loop_rate(50);
@@ -394,6 +410,12 @@ info_counter++;
     zCmd = zOffsetRemaining;
 
    
+       if(hover_flag == 1)
+    {
+        ROS_INFO("Drone Stop");
+        droneControlSignal(0,0,0,0);
+
+    }
 
     /*!
    * @brief: if we already started breaking, keep break for 50 sample (1sec)
