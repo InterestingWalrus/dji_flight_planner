@@ -182,6 +182,15 @@ bool FlightControl::releaseControl()
     }
 }
 
+
+void FlightControl::getFusedGps(double& lat, double& lon, double& alt)
+{
+  DJI::OSDK::Telemetry::GPSFused gpsfused;
+
+  lat = gpsfused.altitude;
+
+}
+
 /*!
  * This function demos how to use the flight_status
  * and the more detailed display_mode (only for A3/N3)
@@ -207,6 +216,7 @@ bool FlightControl::monitoredTakeoff()
          ros::Time::now() - start_time < ros::Duration(5)) {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
+
   }
 
   if(ros::Time::now() - start_time > ros::Duration(5)) {

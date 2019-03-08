@@ -19,6 +19,8 @@
 #include <tf/tf.h>
 #include <sensor_msgs/Joy.h>
 #include "dji_sdk/dji_sdk.h"
+#include <djiosdk/dji_vehicle.hpp>
+#include <dji_sdk/dji_sdk_node.h>
 
 #include "m100_flight_planner/flight_control.h"
 #include "m100_flight_planner/mobile_comm.h"
@@ -28,16 +30,6 @@
 
 #define PI (double) 3.141592653589793
 #define C_EARTH (double)6378137.0
-
-// static double Deg_To_Rad( double degree)
-// {
-//     return degree * (PI/180.0);
-// };
-
-// static double Rad_To_Deg(double rad)
-// {
-//   return rad * (180.0/PI);  
-// };
 
 enum MissionState
 {
@@ -91,6 +83,7 @@ class FlightPlanner
 
         void ekf_gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg);
+        void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
 
         void ekf_odometry_callback(const nav_msgs::Odometry::ConstPtr& msg);
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);

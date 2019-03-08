@@ -62,6 +62,8 @@ class FlightControl
         bool takeoff_land(int task);
         bool set_local_position();
 
+        void getFusedGps(double& lat, double& lon, double& alt);
+
 
 
         float computeTimeToLand(); // based on a 1 m/s descent speed
@@ -89,6 +91,8 @@ class FlightControl
     uint8_t display_mode  = 255;
         
     sensor_msgs::NavSatFix current_gps; 
+
+    sensor_msgs::NavSatFix fused_current_gps; 
     uint8_t gps_health;
     float height_above_takeoff;
    

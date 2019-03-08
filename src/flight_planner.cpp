@@ -286,12 +286,12 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             // SET HOME GPS LOCATION here.
             home_gps_location = current_gps_location;      
 
-            ROS_INFO("Logged home GPS location at Lat:%f  , Lon:%f  , Alt:%f ", home_gps_location.latitude, home_gps_location.longitude, home_start_gps_location.altitude);
+            ROS_INFO("Logged home GPS location at Lat:%f  , Lon:%f  , Alt:%f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude);
           
              
             // Set Home GPS Altitude as a 5 metre offset from the current take off altitude of the drone
             home_gps_location.altitude = current_gps_location.altitude +  5.0;
-            ROS_INFO("Logged home return GPS Altitude :%f ", home_start_gps_location.altitude);
+            ROS_INFO("Logged home return GPS Altitude :%f ", home_gps_location.altitude);
 
             if(flightControl.check_M100())
                 {
@@ -749,6 +749,119 @@ void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigne
 
 }
 
+/*
+Callbacks for the flight anomalies reported by the drone
+Implement detailed safety routines here
+Only Support A3/N3 
+*/
+void FlightPlanner::flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr & msg)
+{
+    uint32_t flightAnomalydata = msg->data;
+
+    if(flightAnomalydata)
+    {
+        // WHat should we do fo each use case?
+        ROS_ERROR("Flight Anomaly detected by the UAV:" );
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::IMPACT_IN_AIR)
+        {
+            ROS_ERROR("UAV Struck an objkect in air");
+            // Define what should be done here
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::RANDOM_FLY)
+        {
+            // Pause mission and let drone just stop in air. 
+            ROS_ERROR("UAV randomly implemented flight routine without command. Pausing Mission");
+            droneControlSignal(0, 0, 0, 0, true, true);
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::VERTICAL_CONTROL_FAIL)
+        {
+            ROS_ERROR("UAV has lost Height Control, Drone landing ");
+            flightControl.land();
+            
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::HORIZONTAL_CONTROL_FAIL)
+        {
+            ROS_ERROR("UAV has lost roll/pitch control, Hovering in the air");
+            droneControlSignal(0,0,0,0, true, true);
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::YAW_CONTROL_FAIL)
+        {
+            ROS_ERROR("UAV has lost yaw control" );
+            // do something here....
+            // We don't essentially want to  stop anything if we can't yaw but 
+            // revisit this aspect later on I guess.
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::AIRCRAFT_IS_FALLING)
+        {
+            ROS_ERROR("Aircraft is falling");
+            // Well, we're fucked innit?
+            // possibly try to stabilise?
+            droneControlSignal(0,0,0,0);
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::STRONG_WIND_LEVEL1)
+        {
+            ROS_INFO("Strong Winds of LEVEL 1, Fly with caution");
+
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::STRONG_WIND_LEVEL2)
+        {
+            ROS_INFO("Strong Winds of LEVEL 2, Drone flying back home");
+            // Using the default go Home function on this for now
+            flightControl.goHome();
+            
+            
+        }
+         if(flightAnomalydata && dji_sdk::FlightAnomaly::COMPASS_INSTALLATION_ERROR)
+        {
+            ROS_ERROR("Compass INstalled incorrectly, Aircraft will land");
+            // Well, we're fucked innit?
+            // possibly try to stabilise?
+            flightControl.land();
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::IMU_INSTALLATION_ERROR)
+        {
+            ROS_ERROR("IMU INSTALLATION ERROR, LANDING");
+            flightControl.land();
+
+        }
+
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::ESC_TEMPERATURE_HIGH)
+        {
+            ROS_INFO("ESC Temperature too high, keep an eye on this");
+
+    
+            
+            
+        }
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::ESC_DISCONNECTED)
+        {
+            ROS_ERROR("ESC DIsconnected, land drone now");
+            flightControl.land();
+            
+            
+        }
+        if(flightAnomalydata && dji_sdk::FlightAnomaly::GPS_YAW_ERROR)
+        {
+            ROS_ERROR("GPS Yaw ERROR");
+            // Not sure how to handle this...
+            
+            
+            
+        }
+
+
+    }
+
+}
+
 void FlightPlanner::onWaypointReached()
 { 
     // check if we are to land at the waypoint. 
@@ -770,18 +883,32 @@ void FlightPlanner::onWaypointReached()
 
             else
             {
-                //performTask = flightControl.monitoredLanding();
+                performTask = flightControl.monitoredLanding();
                 // This doesn't work on S1000 for now.
                 // TODO: Would need to do some checks here to 
-                flightControl.land();
+                //flightControl.land();
             }
 
             if(performTask)
             {
                 // Pause for a period of time here...
                 // Integrate whatever task we're doing at this point.
-                ros::Duration(10).sleep();
-                flightControl.M100monitoredTakeoff();
+
+                if(flightControl.check_M100())
+                {
+                     ros::Duration(10).sleep();
+                    flightControl.M100monitoredTakeoff();
+                }
+
+                else
+                {
+
+                    ros::Duration(10).sleep();
+                    flightControl.monitoredTakeoff();
+                    
+                }
+                
+               
             }
 
             else
