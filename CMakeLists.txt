@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  message_generation
   sensor_msgs
   geometry_msgs
 )
@@ -22,30 +21,10 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(DJIOSDK REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-
-add_message_files(
-  FILES
-  Compass.msg
-  Esc.msg
-  EscList.msg
-  FusedGps.msg
-  GpsDetail.msg
-  GpsTimestamp.msg
-)
-
-
-generate_messages(
-  DEPENDENCIES
-  geometry_msgs
-  nav_msgs
-  std_msgs
-  sensor_msgs
-)
-
 catkin_package(
    INCLUDE_DIRS include
   CATKIN_DEPENDS
-        message_runtime    
+        #message_runtime    
         geometry_msgs
         nav_msgs
         std_msgs
@@ -65,7 +44,7 @@ include_directories(
 
 
 
-add_executable(m100_flight_planner src/flight_control.cpp src/flight_planner.cpp src/mobile_comm.cpp src/PID.cpp src/telemetry_publisher.cpp )
+add_executable(m100_flight_planner src/flight_control.cpp src/flight_planner.cpp src/mobile_comm.cpp src/PID.cpp)
 
 
 target_link_libraries(m100_flight_planner
@@ -74,7 +53,7 @@ target_link_libraries(m100_flight_planner
     ${DJIOSDK_LIBRARIES}
 		)
 
-add_dependencies(m100_flight_planner dji_sdk_generate_messages_cpp dji_flight_planner_generate_messages_cpp)
+add_dependencies(m100_flight_planner dji_sdk_generate_messages_cpp)
 
 target_link_libraries(m100_flight_planner
   ${catkin_LIBRARIES}

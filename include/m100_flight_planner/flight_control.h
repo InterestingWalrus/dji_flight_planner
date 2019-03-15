@@ -13,6 +13,8 @@
 #include <dji_sdk/QueryDroneVersion.h>
 #include <dji_sdk/SetLocalPosRef.h>
 #include <dji_sdk/Activation.h>
+#include <dji_sdk/FusedGps.h>
+
 
 
 #include "m100_flight_planner/mobile_comm.h"
@@ -62,8 +64,7 @@ class FlightControl
         bool takeoff_land(int task);
         bool set_local_position();
 
-        void getFusedGps(double& lat, double& lon, double& alt);
-
+        void fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg);
 
 
         float computeTimeToLand(); // based on a 1 m/s descent speed
@@ -84,7 +85,7 @@ class FlightControl
     ros::Subscriber gps_health_sub;
     ros::Subscriber flightStatusSub;
     ros::Subscriber height_sub;
-
+    ros::Subscriber gps_fused_sub;
 
 
     uint8_t flight_status = 255;
@@ -93,6 +94,7 @@ class FlightControl
     sensor_msgs::NavSatFix current_gps; 
 
     sensor_msgs::NavSatFix fused_current_gps; 
+    uint16_t satellite_Strength;
     uint8_t gps_health;
     float height_above_takeoff;
    

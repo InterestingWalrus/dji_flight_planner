@@ -9,11 +9,13 @@
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/UInt8.h>
 
+
 // DJI SDK includes
 #include <dji_sdk/DroneTaskControl.h>
 #include <dji_sdk/SDKControlAuthority.h>
 #include <dji_sdk/QueryDroneVersion.h>
 #include <dji_sdk/SetLocalPosRef.h>
+#include <dji_sdk/FusedGps.h>
 
 
 #include <tf/tf.h>
@@ -25,6 +27,7 @@
 #include "m100_flight_planner/flight_control.h"
 #include "m100_flight_planner/mobile_comm.h"
 #include "m100_flight_planner/PID.h"
+
 #include <queue>
 
 
@@ -81,7 +84,10 @@ class FlightPlanner
         void MobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& from_mobile_data);
         void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
 
+        //TODO Deprecate this: No longer needed. 
         void ekf_gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
+
+        void fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg);
         void local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg);
         void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
 
@@ -89,14 +95,8 @@ class FlightPlanner
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 
-
         void keyboardControl();
-
-
-       
-
-
-    
+ 
    
     private:
 
@@ -129,7 +129,9 @@ class FlightPlanner
     float home_target_offset_y;
     float home_target_offset_z;
 
-
+    // Number of visible satellites
+    uint16_t num_satellites;
+    
    // drone takeoff absolute and local positions
     sensor_msgs::NavSatFix start_gps_location;
     geometry_msgs::Point start_local_position;
@@ -199,6 +201,7 @@ class FlightPlanner
     ros::Subscriber gps_sub;
     ros::Subscriber local_position_sub;
     ros::Subscriber mobile_data_subscriber;
+    ros::Subscriber gps_fused_sub;
     
 
 };

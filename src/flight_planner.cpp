@@ -57,16 +57,30 @@ void FlightPlanner::keyboardControl()
 
 FlightPlanner::FlightPlanner()
 {
+
+    FlightControl flightControl;
+    PID pid;
+
+    // SET Which GPS topic to subscribe to based on which drone is being used..
+    // Currently can't use the same subscriber as /dji_sdk/fused_gps isn't a NAVSATFIX Type 
+
+    if(flightControl.check_M100())
+    {
+        gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+    }
+
+    else
+    {
+        gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/fused_gps", 10, &FlightPlanner::fused_gps_callback, this );
+    }
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
-    gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+    
     //gps_sub = nh.subscribe("/gps/filtered", 10, &FlightPlanner::ekf_gps_callback, this);  // for EKF control testing
     local_position_sub = nh.subscribe("/dji_sdk/local_position", 10, &FlightPlanner::local_position_callback, this);
    // local_position_sub = nh.subscribe("odometry/filtered", 10, &FlightPlanner::ekf_odometry_callback, this); // For EKF control testing
     attitude_sub = nh.subscribe("/dji_sdk/attitude", 10, &FlightPlanner::attitude_callback, this);
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
-
-    FlightControl flightControl;
-    PID pid;
+    
 
     ROS_INFO("In control loop");
 
@@ -860,6 +874,13 @@ void FlightPlanner::flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr
 
     }
 
+    // Chheck number of Satellites
+    if(num_satellites < 5)
+    {
+        ROS_WARN("Number of GPS Satellites is less than 5, Might get inaccurate FIX information");
+        
+    }
+
 }
 
 void FlightPlanner::onWaypointReached()
@@ -1119,6 +1140,14 @@ void FlightPlanner::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 
   ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
 
+}
+
+void FlightPlanner::fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg)
+{
+   current_gps_location.altitude = msg->altitude;
+   current_gps_location.latitude = msg->latitude;
+   current_gps_location.longitude = msg->longitude;
+   num_satellites = msg->visibleSatelliteNumber;
 }
 
 

@@ -9,16 +9,21 @@ FlightControl::FlightControl()
    query_version_service      = nh.serviceClient<dji_sdk::QueryDroneVersion>("dji_sdk/query_drone_version");
    drone_activation_service = nh.serviceClient<dji_sdk::Activation>("dji_sdk/activation");
    set_local_pos_reference    = nh.serviceClient<dji_sdk::SetLocalPosRef> ("dji_sdk/set_local_pos_ref");
-
-   
-
+ 
    gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
-  // gps_sub = nh.subscribe("gps/filtered", 10, &FlightControl::gps_callback, this);        // For EKF control tetsing
    gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
    flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
     height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
-
+    gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/fused_gps", 10, &FlightControl::fused_gps_callback, this );
     
+}  
+
+void FlightControl::fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg)
+{
+   fused_current_gps.altitude = msg->altitude;
+   fused_current_gps.latitude = msg->latitude;
+   fused_current_gps.longitude = msg->longitude;
+   satellite_Strength = msg->visibleSatelliteNumber;
 }
 
 void FlightControl::flight_status_callback(const std_msgs::UInt8::ConstPtr& msg)
@@ -183,13 +188,7 @@ bool FlightControl::releaseControl()
 }
 
 
-void FlightControl::getFusedGps(double& lat, double& lon, double& alt)
-{
-  DJI::OSDK::Telemetry::GPSFused gpsfused;
 
-  lat = gpsfused.altitude;
-
-}
 
 /*!
  * This function demos how to use the flight_status
@@ -277,7 +276,7 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
   
   float rosTime_to_land = computeTimeToLand() + 5;
   ros::Time start_time = ros::Time::now();
-
+  
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND)) {
     return false;
   }
@@ -310,15 +309,17 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
     ros::spinOnce();
   }
 
-  if (display_mode != DJISDK::DisplayMode::MODE_P_GPS || display_mode != DJISDK::DisplayMode::MODE_ATTITUDE)
+  if (flight_status != DJISDK::FlightStatus::STATUS_ON_GROUND)
   {
-    ROS_INFO("Successful Landing!");
-    start_time = ros::Time::now();
+    ROS_ERROR_ONCE("Failed Landing!");
+    return false;
   }
   else
   {
-    ROS_ERROR("Landing finished, but the aircraft is in an unexpected mode. Please connect DJI GO.");
-    return false;
+    ROS_INFO("A3/N3 Drone has successfully landed");
+     start_time = ros::Time::now();
+     ros::spinOnce();
+    
   }
 
   return true;
@@ -351,37 +352,30 @@ bool FlightControl::M100monitoredTakeoff()
     ros::Duration(0.01).sleep();
     ros::spinOnce();
   }
-
   
 
   if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_IN_AIR || height_above_takeoff - home_takeoff < 0.6)
   {
-   
-  
+     
     if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_FINISHED_LANDING)
     {
       ROS_ERROR ("Flight status: Drone Finished Landing");
-
     }
 
     if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_LANDING)
     {
       ROS_ERROR ("Flight status: Drone Landing");
-
     }
 
     if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_ON_GROUND)
     {
       ROS_ERROR ("Flight status: Drone still on the ground");
-
     }
 
     if (flight_status == DJISDK::M100FlightStatus::M100_STATUS_TAKINGOFF)
     {
-      ROS_ERROR ("Flight status: Drone Taking off");
-
+      ROS_INFO ("Flight status: Drone Taking off");
     }
-
     ROS_INFO("Home Takeoff point: %f", home_takeoff);
     ROS_INFO("Current Height above takeoff position: %f", home_takeoff);
     ROS_INFO ("Difference: %f m",  height_above_takeoff - home_takeoff);
@@ -406,13 +400,12 @@ float FlightControl::computeTimeToLand()
 
   int droneLandSpeed = 1;
 
-
-
   float current_height = height_above_takeoff;
 
   float timeToLand = (current_height / droneLandSpeed) ;
 
-  // Maximum time drone will take to land from an altitude of 100 metres is 55 seconds.. 
+  // Maximum time M100 drone will take to land from an altitude of 100 metres is 55 seconds.. 
+  // TODO: Test A3/N3 Time. 
   // Tested in simulator
   //TODO use Velocity Z to compute variable time to land)
 
