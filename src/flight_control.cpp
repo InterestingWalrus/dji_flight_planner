@@ -15,8 +15,21 @@ FlightControl::FlightControl()
    flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
     height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
     gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/fused_gps", 10, &FlightControl::fused_gps_callback, this );
+     velocity_sub = nh.subscribe("/dji_sdk/velocity", 10,  &FlightControl::velocity_callback, this);
+
     
 }  
+
+void FlightControl::velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg)
+{
+    
+    velocity_data.vector = msg->vector;
+    velocity_data.header = msg->header;
+
+   
+
+ 
+}
 
 void FlightControl::fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg)
 {
@@ -273,8 +286,8 @@ bool FlightControl::monitoredTakeoff()
 // Untested.
 bool FlightControl::monitoredLanding() // WOrk on this later......
 {
+  float N3_land = computeTimeToLand();
   
-  float rosTime_to_land = computeTimeToLand() + 5;
   ros::Time start_time = ros::Time::now();
   
   if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND)) {
@@ -287,12 +300,12 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
   // Step 1.1: landDrone
   while (flight_status != DJISDK::FlightStatus::STATUS_ON_GROUND &&
          display_mode != DJISDK::DisplayMode::MODE_AUTO_LANDING &&
-         ros::Time::now() - start_time < ros::Duration(rosTime_to_land)) {
+         ros::Time::now() - start_time < ros::Duration(N3_land)) {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
   }
 
-  if(ros::Time::now() - start_time > ros::Duration(rosTime_to_land)) {
+  if(ros::Time::now() - start_time > ros::Duration(N3_land)) {
     ROS_ERROR("Landing Failed");
     return false;
   }
@@ -304,7 +317,7 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
 
   // Final check: Finished Landing
   while ((display_mode == DJISDK::DisplayMode::MODE_AUTO_LANDING) &&
-          ros::Time::now() - start_time < ros::Duration(rosTime_to_land)) {
+          ros::Time::now() - start_time < ros::Duration(N3_land)) {
     ros::Duration(0.01).sleep();
     ros::spinOnce();
   }
@@ -397,26 +410,73 @@ bool FlightControl::M100monitoredTakeoff()
 // returns the time required for the drone to land. 
 float FlightControl::computeTimeToLand()
 {
+    float droneLandSpeed;
+    float current_height;
 
-  int droneLandSpeed = 1;
+    // Use M100 for this
+      if(check_M100())
+    {
+      ROS_INFO("Drone is a M100 Variant");
+      
+      droneLandSpeed = 1;
+      current_height = height_above_takeoff;
+      timeToLand = (current_height / droneLandSpeed) ;
 
-  float current_height = height_above_takeoff;
+      // Maximum time M100 drone will take to land from an altitude of 100 metres is 55 seconds.. 
+      // TODO: Test A3/N3 Time. 
+      // Tested in simulator
+      //TODO use Velocity Z to compute variable time to land)
 
-  float timeToLand = (current_height / droneLandSpeed) ;
+      if (timeToLand > 55)
+      {
+        timeToLand = 55;
+      }
 
-  // Maximum time M100 drone will take to land from an altitude of 100 metres is 55 seconds.. 
-  // TODO: Test A3/N3 Time. 
-  // Tested in simulator
-  //TODO use Velocity Z to compute variable time to land)
+      ROS_INFO_THROTTLE(5, "Time required to land is %f", timeToLand);
+    }
 
-  if (timeToLand > 55)
-  {
-    timeToLand = 55;
-  }
+    else
+    {
+      ROS_INFO_ONCE("Drone is a N3/A3 Type");
+    
+      droneLandSpeed = fabs(velocity_data.vector.z);
+      current_height = height_above_takeoff;
 
-  ROS_INFO("Time required to land is %f", timeToLand);
+     if(current_height >= 40)
+     {
+       timeToLand = (current_height / droneLandSpeed) + 50 ;
+     }
 
-   return timeToLand; 
+     else
+     {
+        timeToLand = (current_height / droneLandSpeed) ;  
+     }
+     
+ 
+
+      if(std::isnan(timeToLand))
+      {
+        ROS_INFO_ONCE("IS NAnnanananana");
+        timeToLand = 0;
+      }
+
+    // empirically time to land from the N3 is 90 seconds. so cap time to land to 90 seconds
+
+     if(timeToLand > 90)
+     {
+       timeToLand = 90;
+     }
+
+      if(!std::isinf(timeToLand))
+      {
+        ROS_INFO_THROTTLE(5, "Time required to land is %f", timeToLand);
+       // ROS_INFO("Speed %f", droneLandSpeed);
+
+      } 
+    }
+  
+
+   return timeToLand + 5; 
 }
 
 bool FlightControl::M100monitoredLanding()

@@ -95,6 +95,7 @@ class FlightPlanner
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 
+      
         void keyboardControl();
  
    
@@ -202,6 +203,7 @@ class FlightPlanner
     ros::Subscriber local_position_sub;
     ros::Subscriber mobile_data_subscriber;
     ros::Subscriber gps_fused_sub;
+ 
     
 
 };

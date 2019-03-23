@@ -5,6 +5,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <std_msgs/UInt8.h>
+#include <cmath>
 #include <std_msgs/Float32.h>
 
 // DJI SDK includes
@@ -65,6 +66,8 @@ class FlightControl
         bool set_local_position();
 
         void fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg);
+ 
+        void velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg);
 
 
         float computeTimeToLand(); // based on a 1 m/s descent speed
@@ -97,6 +100,14 @@ class FlightControl
     uint16_t satellite_Strength;
     uint8_t gps_health;
     float height_above_takeoff;
+
+      // Velocity Data
+  geometry_msgs::Vector3Stamped velocity_data;
+     ros::Subscriber velocity_sub;
+
+
+    float timeToLand;
+
    
 
 

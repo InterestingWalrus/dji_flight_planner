@@ -66,12 +66,14 @@ FlightPlanner::FlightPlanner()
 
     if(flightControl.check_M100())
     {
+        ROS_INFO("DJI M100");
         gps_sub = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
     }
 
-    else
+    else 
     {
-        gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/fused_gps", 10, &FlightPlanner::fused_gps_callback, this );
+        ROS_INFO("DJI N3/A3");
+        gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/gps_fused", 10, &FlightPlanner::fused_gps_callback, this );
     }
     control_pub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
     
@@ -1148,6 +1150,8 @@ void FlightPlanner::fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg)
    current_gps_location.latitude = msg->latitude;
    current_gps_location.longitude = msg->longitude;
    num_satellites = msg->visibleSatelliteNumber;
+
+     ROS_INFO_ONCE("GPS Location %f , %f , %f",  current_gps_location.latitude,  current_gps_location.longitude, current_gps_location.altitude);
 }
 
 
