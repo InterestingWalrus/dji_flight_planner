@@ -66,6 +66,8 @@ class FlightPlanner
         void reset(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Point &current_local_pos);
 
         void stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
+
+        void stepPID(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
         bool isMissionFinished();
         bool reachedWaypoint();
         void onWaypointReached();
@@ -77,7 +79,6 @@ class FlightPlanner
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
         void localOffsetFromGpsOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
-        void droneControlSignalPID(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);
         geometry_msgs::Vector3 toEulerAngle(geometry_msgs::Quaternion quat);
 
 
@@ -94,6 +95,8 @@ class FlightPlanner
         void ekf_odometry_callback(const nav_msgs::Odometry::ConstPtr& msg);
         void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
+
+        void velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg); // simply using this to get dt for the PID
 
       
         void keyboardControl();
@@ -194,7 +197,6 @@ class FlightPlanner
  
     MobileComm mobileCommManager;
     FlightControl flightControl;
-    PID pid;  
     ros::NodeHandle nh;
     ros::Publisher control_pub;
 
@@ -203,6 +205,12 @@ class FlightPlanner
     ros::Subscriber local_position_sub;
     ros::Subscriber mobile_data_subscriber;
     ros::Subscriber gps_fused_sub;
+
+    // Velocity Data
+    geometry_msgs::Vector3Stamped velocity_data;
+    ros::Subscriber velocity_sub;
+
+     ros::Time current_time, last_time;
  
     
 

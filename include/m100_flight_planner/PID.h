@@ -1,34 +1,31 @@
+
 #ifndef _PID_H_
 #define _PID_H_
-#include <iostream>
-#include <stdio.h>
-#include <cstdlib>
-#include <cmath>
-#include <ros/ros.h>
 
-class PID
+typedef struct _pid
 {
-   public:
-   PID();
-   void resetController();
-   void setMax(double maxValue);
-   void setMin(double minValue);
-   double calculate(double setpoint, double process_value, double minVal, double maxVal);  // setpoint is what we ant value to be. // process_value is the actual value;
+    float target_position;
+    float current_position;
+    float err;
+    float prev_error;
+    float Kp, Ki, Kd;
+    float velocity_output;
+    float integral;
+    float max_val;
+    float min_val;
+} Pid;
 
-   // error is process value - setpoint.
+class Pid_control
+{
+  public:
+    void PID_init(float kp, float ki, float kd, float max, float min);
+    float PID_update(float current, float target, const double dt);
+   //float PID_update(float current, float target);
+    void PID_reset();
 
-
-   private:
-   double dt;
-   double max;
-   double min;
-   double Kp;
-   double Ki;
-   double Kd;
-   double prev_error;
-   double integral;
-
-  
+  private:
+    int index;
+    Pid pid;
 };
 
 

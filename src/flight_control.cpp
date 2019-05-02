@@ -22,6 +22,7 @@ FlightControl::FlightControl()
 
 void FlightControl::velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg)
 {
+  
     
     velocity_data.vector = msg->vector;
     velocity_data.header = msg->header;
@@ -450,6 +451,7 @@ float FlightControl::computeTimeToLand()
      else
      {
         timeToLand = (current_height / droneLandSpeed) ;  
+        
      }
      
  
