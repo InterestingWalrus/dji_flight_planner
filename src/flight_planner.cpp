@@ -1,8 +1,9 @@
 #include "m100_flight_planner/flight_planner.h"
 
 double takeoff_altitude;  // to tune PID altitude control.
-double dt = 0.02;
-int pid_flag = 1;
+double dt = 0;
+ros::Time lastMessageTime;
+int pid_flag = 0;
 
 Pid_control pid_x, pid_y, pid_z, pid_yaw;
 
@@ -269,6 +270,8 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                waypoint_index = 0;
 
                 state = MissionState::IDLE;
+                start_gps_location = current_gps_location;
+                flightControl.set_local_position();
 
                ROS_INFO("Waypoints cleared, Aircraft now in IDLE State");
 
@@ -356,10 +359,10 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                     std::cin >> command;
 
                     std::cout << "command: " << command << std::endl;
-                    pid_x.PID_init(1.2, 0.0, 0.0, speedFactor, -speedFactor);
-                    pid_y.PID_init(1.5, 0.0, 0.0, speedFactor, -speedFactor);
-                    pid_z.PID_init(1.0, 0, 0.0, speedFactor, -speedFactor);
-                    pid_yaw.PID_init(1.5, 0, 0, 2.96, -2.96);
+                    pid_x.PID_init(0.6, 0.0, 0.02, speedFactor, -speedFactor);
+                    pid_y.PID_init(0.6, 0, 0.02, speedFactor, -speedFactor);
+                    pid_z.PID_init(5.9, 0, 0., speedFactor, -speedFactor);
+                    pid_yaw.PID_init(1.5, 0, 0, 2, -2);
 
                         while(ros::ok() && command == "c")
                         {
@@ -805,15 +808,6 @@ else
     ROS_INFO("X:%d,Y:%d,Z:%d,Yaw: %d", finished_x, finished_y, finished_z, finished_yaw);
   }
 
-//   if (finished_x || finished_y || finished_z )
-//   {
-//     droneControlSignal(xCmd, yCmd, zCmd, 0, false);
-//     return;
-//   }
-
-
- 
-
   if(hover_flag == 1)
     {
         ROS_INFO("Drone Stop");
@@ -1075,6 +1069,7 @@ void FlightPlanner::onMissionFinished()
     flight_plan.clear();
     waypoint_count = 0;
     waypoint_index = 0;
+
 }
 void FlightPlanner::localOffsetFromGpsOffset(geometry_msgs::Vector3& deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin)
 {
@@ -1122,6 +1117,9 @@ void FlightPlanner::runMission()
                 else
                 {
                     ROS_INFO_THROTTLE(2, "Mission in idle state, waiting for a mission plan");
+                    // Set position reference here
+                    start_gps_location = current_gps_location;
+                    flightControl.set_local_position(); // Should only be used when a drone lands on the ground!!!
                 }
 
 
@@ -1133,8 +1131,8 @@ void FlightPlanner::runMission()
                 // if  mission isn't finished, keep stepping through mission.
                 if(!reachedWaypoint())
                 {
-                    //step(current_gps_location, current_drone_attitude);
-                    stepPID(current_gps_location, current_drone_attitude);
+                    step(current_gps_location, current_drone_attitude);
+                    //stepPID(current_gps_location, current_drone_attitude);
                 }
 
                 else
@@ -1281,7 +1279,12 @@ void FlightPlanner::ekf_gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg
 
 void FlightPlanner::local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
-    current_local_position = msg->point;
+     ros::Time now = ros::Time::now();
+     ros::Duration time = now - lastMessageTime;
+     current_local_position = msg->point;
+     lastMessageTime = now;
+
+    dt = time.toSec(); 
 
 }
 
