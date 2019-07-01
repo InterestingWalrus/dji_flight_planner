@@ -50,5 +50,3 @@ void MobileComm::SendDataToMobile(AckReturnToMobile returnMobileAck)
 
 
 
-
-
