@@ -8,6 +8,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/UInt8.h>
+#include <std_msgs/Float32.h>
 #include <tf/tf.h>
 #include <sensor_msgs/Joy.h>
 
@@ -58,11 +59,16 @@ class FlightBase
         ros::Subscriber mobile_data_subscriber;
         ros::Subscriber velocity_subscriber;
 
+        geometry_msgs::Vector3Stamped velocity_data;
+        geometry_msgs::Point current_local_position;
+        sensor_msgs::NavSatFix current_gps_location;
+        MobileComm mobileCommManager;
+        uint16_t num_satellites;
+
+
 
         uint8_t flight_status = 255;
         uint8_t display_mode  = 255;
-
-
 
 
     public:
@@ -70,22 +76,21 @@ class FlightBase
         ~FlightBase();
 
         //TODO Deprecate 
-        void fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg);
-        void local_position_callback(const geometry_msgs::PointStamped::ConstPtr& msg);
+        void fusedGpsCallback(const dji_sdk::FusedGps::ConstPtr& msg);
+        void localPositionCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
         void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
-        void ekf_odometry_callback(const nav_msgs::Odometry::ConstPtr& msg);
-        void attitude_callback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
+        void ekfOdometryCallback(const nav_msgs::Odometry::ConstPtr& msg);
+        void attitudeCallback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
-        void flight_status_callback(const std_msgs::UInt8::ConstPtr& msg);
-        void display_mode_callback(const std_msgs::UInt8::ConstPtr& msg);
-        void gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg);
-        void gps_health_callback(const std_msgs::UInt8::ConstPtr& msg);
-        void height_callback(const std_msgs::Float32::ConstPtr& msg);
-        void MobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& from_mobile_data);
-        void velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg); 
-
-
-
+        void flightStatusCallback(const std_msgs::UInt8::ConstPtr& msg);
+        void displayModeCallback(const std_msgs::UInt8::ConstPtr& msg);
+        void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
+        void gpsHealthCallback(const std_msgs::UInt8::ConstPtr& msg);
+        void heightCallback(const std_msgs::Float32::ConstPtr& msg);
+        void velocityCallback(const geometry_msgs::Vector3Stamped::ConstPtr& msg); 
+        void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
+        bool setLocalPosition();
+        geometry_msgs::Vector3 toEulerAngle(geometry_msgs::Quaternion quat);
 
 };
 

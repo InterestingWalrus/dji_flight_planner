@@ -2,10 +2,14 @@
 #ifndef _PID_H_
 #define _PID_H_
 
+#include <ros/ros.h>
+
+
 typedef struct _pid
 {
     float target_position;
     float current_position;
+    float last_position;  // to get rid of derivative kick
     float err;
     float prev_error;
     float Kp, Ki, Kd;
@@ -13,6 +17,7 @@ typedef struct _pid
     float integral;
     float max_val;
     float min_val;
+    double sampleTime;
 } Pid;
 
 class Pid_control
@@ -26,6 +31,8 @@ class Pid_control
   private:
     int index;
     Pid pid;
+    ros::Time lastMessageTime;
+   
 };
 
 
