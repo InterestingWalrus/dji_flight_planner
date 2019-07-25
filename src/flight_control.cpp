@@ -4,102 +4,10 @@ using namespace DJI::OSDK;
 
 FlightControl::FlightControl()
 {
-   ctrl_authority_service = nh.serviceClient<dji_sdk::SDKControlAuthority> ("dji_sdk/sdk_control_authority");
-   drone_task_service     = nh.serviceClient<dji_sdk::DroneTaskControl>("dji_sdk/drone_task_control");
-   query_version_service      = nh.serviceClient<dji_sdk::QueryDroneVersion>("dji_sdk/query_drone_version");
-   drone_activation_service = nh.serviceClient<dji_sdk::Activation>("dji_sdk/activation");
-   set_local_pos_reference    = nh.serviceClient<dji_sdk::SetLocalPosRef> ("dji_sdk/set_local_pos_ref");
+   
  
-   gps_sub = nh.subscribe("dji_sdk/gps_position", 10, &FlightControl::gps_callback, this);
-   gps_health_sub = nh.subscribe("dji_sdk/gps_health", 10, &FlightControl::gps_health_callback, this);
-   flightStatusSub = nh.subscribe("dji_sdk/flight_status", 10, &FlightControl::flight_status_callback, this);
-    height_sub = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightControl::height_callback, this);
-    gps_fused_sub = nh.subscribe<dji_sdk::FusedGps>("dji_sdk/fused_gps", 10, &FlightControl::fused_gps_callback, this );
-     velocity_sub = nh.subscribe("/dji_sdk/velocity", 10,  &FlightControl::velocity_callback, this);
 
-    
 }  
-
-void FlightControl::velocity_callback(const geometry_msgs::Vector3Stamped::ConstPtr& msg)
-{
-  
-    
-    velocity_data.vector = msg->vector;
-    velocity_data.header = msg->header;
-
-   
-
- 
-}
-
-void FlightControl::fused_gps_callback(const dji_sdk::FusedGps::ConstPtr& msg)
-{
-   fused_current_gps.altitude = msg->altitude;
-   fused_current_gps.latitude = msg->latitude;
-   fused_current_gps.longitude = msg->longitude;
-   satellite_Strength = msg->visibleSatelliteNumber;
-}
-
-void FlightControl::flight_status_callback(const std_msgs::UInt8::ConstPtr& msg)
-{
-  flight_status = msg->data;
-}
-
-void FlightControl::display_mode_callback(const std_msgs::UInt8::ConstPtr& msg)
-{
-  display_mode = msg->data;
-}
-
-void FlightControl::gps_callback(const sensor_msgs::NavSatFix::ConstPtr& msg)
-{
-  current_gps.latitude = msg->latitude;
-  current_gps.longitude = msg->longitude;
-  current_gps.altitude = msg->altitude;
-}
- 
-void FlightControl::gps_health_callback(const std_msgs::UInt8::ConstPtr& msg)
-{
-  gps_health = msg->data;
-  ROS_INFO_ONCE ("GPS Health: %i", gps_health);
-}
-
-void FlightControl::activate()
-{
-   dji_sdk::Activation activation;
-   drone_activation_service.call(activation);
-   
-   if(!activation.response.result)
-   {
-       ROS_ERROR("Drone control program not activated. Please check your app key");
-   }
-
-   else
-   {
-       ROS_INFO("Activation Successful");
-   }
-
-}
-
-
-
-// checks if drone is Matrice M100.
-bool FlightControl::check_M100()
-{
-
-    dji_sdk::QueryDroneVersion query;
-    query_version_service.call(query);
-
-    if(query.response.version == DJISDK::DroneFirmwareVersion::M100_31)
-    {
-        return true;
-    }
-
-    else
-    {
-        return false;
-    }
-
-}
 
 void FlightControl::goHome()
 {
@@ -130,42 +38,8 @@ void FlightControl::land()
     }
 }
 
-bool FlightControl::obtainControl()
-{
-    dji_sdk::SDKControlAuthority authority;
-    authority.request.control_enable = 1;
-    ctrl_authority_service.call(authority);
-    if(authority.response.result)
-    {
-        ROS_INFO("Program has obtained control");
-        return true;
 
-    }
-    else
-    {
-        if(authority.response.ack_data == 3 && authority.response.cmd_set == 1 && authority.response.cmd_id == 0)
-        {
-            ROS_INFO("Call control Authority again");
-        }
-        else
-        {
-            ROS_ERROR("Failed to obtain control authority");
-            return false;
-        }
-    }
-
-    return true;
-
-}
-
-
-void FlightControl::height_callback(const std_msgs::Float32::ConstPtr& msg)
-{
-    height_above_takeoff = msg->data;
-
-}
-
-bool FlightControl::takeoff_land(int task)
+bool FlightControl::takeoffLand(int task)
 {
   dji_sdk::DroneTaskControl droneTaskControl;
 
@@ -183,23 +57,6 @@ bool FlightControl::takeoff_land(int task)
   return true;
 }
 
-bool FlightControl::releaseControl()
-{
-   dji_sdk::SDKControlAuthority authority;
-    authority.request.control_enable = 0;
-    ctrl_authority_service.call(authority);
-    if(authority.response.result)
-    {
-        ROS_INFO("Program has released control");
-        return true;
-    }
-
-    if(!authority.response.result)
-    {
-        ROS_INFO("Program failed to release control");
-        return true;
-    }
-}
 
 
 
@@ -216,7 +73,7 @@ bool FlightControl::monitoredTakeoff()
 
       ros::Time start_time = ros::Time::now();
 
-  if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF)) {
+  if(!takeoffLand(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF)) {
     return false;
   }
 
@@ -291,7 +148,7 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
   
   ros::Time start_time = ros::Time::now();
   
-  if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND)) {
+  if(!takeoffLand(dji_sdk::DroneTaskControl::Request::TASK_LAND)) {
     return false;
   }
 
@@ -351,7 +208,7 @@ bool FlightControl::M100monitoredTakeoff()
   ros::Time start_time = ros::Time::now();
   
   float home_takeoff = height_above_takeoff;
-  if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF))
+  if(!takeoffLand(dji_sdk::DroneTaskControl::Request::TASK_TAKEOFF))
   {
     ROS_INFO("Did this fail?:");
     return false;
@@ -455,14 +312,14 @@ float FlightControl::computeTimeToLand()
      }
      
  
-
       if(std::isnan(timeToLand))
       {
         ROS_INFO_ONCE("IS NAnnanananana");
         timeToLand = 0;
       }
 
-    // empirically time to land from the N3 is 90 seconds. so cap time to land to 90 seconds
+    // empirically time to land from the N3 is 90 seconds.
+    // so cap time to land to 90 seconds
 
      if(timeToLand > 90)
      {
@@ -486,10 +343,10 @@ bool FlightControl::M100monitoredLanding()
   ros::Time start_time = ros::Time::now();
 
   float rosTime_to_land = computeTimeToLand() + 5;
-  float home_altitude = current_gps.altitude;
+  float home_altitude = current_gps_location.altitude;
   
 
-  if(!takeoff_land(dji_sdk::DroneTaskControl::Request::TASK_LAND))
+  if(!takeoffLand(dji_sdk::DroneTaskControl::Request::TASK_LAND))
   {
     return false;
   }
@@ -505,7 +362,7 @@ bool FlightControl::M100monitoredLanding()
   }
 
   if(flight_status != DJISDK::M100FlightStatus::M100_STATUS_ON_GROUND ||
-      current_gps.altitude - home_altitude > 1.0)
+      current_gps_location.altitude - home_altitude > 1.0)
   {
     ROS_ERROR_ONCE("Landing failed.");
     return false;
@@ -519,12 +376,3 @@ bool FlightControl::M100monitoredLanding()
 
   return true; 
 }
-
-bool FlightControl::set_local_position()
-{
-  dji_sdk::SetLocalPosRef localPosReferenceSetter;
-  set_local_pos_reference.call(localPosReferenceSetter);
-  return localPosReferenceSetter.response.result;
-}
-
-//TODO TAke off bug for when the drone takes off again after landing at a waypoint.

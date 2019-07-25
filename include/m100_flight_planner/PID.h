@@ -4,36 +4,32 @@
 
 #include <ros/ros.h>
 
-
 typedef struct _pid
 {
-    float target_position;
-    float current_position;
+    float current_effort;
+    float target_effort;
     float last_position;  // to get rid of derivative kick
     float err;
     float prev_error;
     float Kp, Ki, Kd;
     float velocity_output;
     float integral;
-    float max_val;
-    float min_val;
+    float max_effort;
+    float min_effort;
     double sampleTime;
 } Pid;
 
 class Pid_control
 {
   public:
-    void PID_init(float kp, float ki, float kd, float max, float min);
-    float PID_update(float current, float target, const double dt);
-   //float PID_update(float current, float target);
-    void PID_reset();
-
+    void PIDinit(float kp, float ki, float kd, float max, float min);
+    void PIDreset();
+    float PIDupdate(float target);
+    float clamp(float input, float min_value, float max_value); // returns a value between the min and max boundaries
+  
   private:
     int index;
     Pid pid;
-    ros::Time lastMessageTime;
-   
 };
-
 
 #endif

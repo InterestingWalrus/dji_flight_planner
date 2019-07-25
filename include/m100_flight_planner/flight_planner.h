@@ -46,6 +46,10 @@ class FlightPlanner : public FlightBase
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);     
         void keyboardControl();
+
+        void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
+
+
  
    
     private:

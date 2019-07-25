@@ -17,7 +17,7 @@
 #include <dji_sdk/SDKControlAuthority.h>
 #include <dji_sdk/QueryDroneVersion.h>
 #include <dji_sdk/SetLocalPosRef.h>
-#include <dji_sdk/FusedGps.h>
+//#include <dji_sdk/FusedGps.h>
 #include "dji_sdk/dji_sdk.h"
 #include <djiosdk/dji_vehicle.hpp>
 #include <dji_sdk/dji_sdk_node.h>
@@ -62,24 +62,30 @@ class FlightBase
         geometry_msgs::Vector3Stamped velocity_data;
         geometry_msgs::Point current_local_position;
         sensor_msgs::NavSatFix current_gps_location;
-        MobileComm mobileCommManager;
-        uint16_t num_satellites;
-
-
-
+        geometry_msgs::Quaternion current_drone_attitude;
+        uint8_t gps_health;
+        MobileComm mobileCommManager;      
+        float height_above_takeoff;
         uint8_t flight_status = 255;
         uint8_t display_mode  = 255;
+        ros::Time current_time, prev_time;
+        double dt;
 
 
     public:
         FlightBase();
         ~FlightBase();
 
+        void activate(); // Activate the drone for SDK control
+        bool check_M100();
+        bool obtainControl();
+        bool releaseControl();
+
         //TODO Deprecate 
-        void fusedGpsCallback(const dji_sdk::FusedGps::ConstPtr& msg);
+        //void fusedGpsCallback(const dji_sdk::FusedGps::ConstPtr& msg);
         void localPositionCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
-        void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
-        void ekfOdometryCallback(const nav_msgs::Odometry::ConstPtr& msg);
+        //void ekfOdometryCallback(const nav_msgs::Odometry::ConstPtr& msg);
+        //void ekfGpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void attitudeCallback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
         void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
         void flightStatusCallback(const std_msgs::UInt8::ConstPtr& msg);
@@ -88,7 +94,6 @@ class FlightBase
         void gpsHealthCallback(const std_msgs::UInt8::ConstPtr& msg);
         void heightCallback(const std_msgs::Float32::ConstPtr& msg);
         void velocityCallback(const geometry_msgs::Vector3Stamped::ConstPtr& msg); 
-        void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
         bool setLocalPosition();
         geometry_msgs::Vector3 toEulerAngle(geometry_msgs::Quaternion quat);
 
