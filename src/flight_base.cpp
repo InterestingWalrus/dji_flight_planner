@@ -15,6 +15,24 @@ FlightBase::FlightBase()
    flight_status_subscriber = nh.subscribe("dji_sdk/flight_status", 10, &FlightBase::flightStatusCallback, this);
    height_subscriber = nh.subscribe("/dji_sdk/height_above_takeoff",10, &FlightBase::heightCallback, this);
    velocity_subscriber = nh.subscribe("/dji_sdk/velocity", 10,  &FlightBase::velocityCallback, this);  
+    local_position_subscriber = nh.subscribe("/dji_sdk/local_position", 10, &FlightBase::localPositionCallback, this);
+   // local_position_subscriber = nh.subscribe("odometry/filtered", 10, &FlightBase::ekf_odometry_callback, this); // For EKF control testing
+    attitude_subscriber = nh.subscribe("/dji_sdk/attitude", 10, &FlightBase::attitudeCallback, this);
+
+
+   // SET Which GPS topic to subscribe to based on which drone is being used..
+   // Currently can't use the same subscriber as /dji_sdk/fused_gps isn't a NAVSATFIX Type 
+   //TODO To be deprecated
+   if(checkM100)
+   {
+       ROS_INFO("DJI M100");
+        // gps_subscriber = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
+   }
+
+   else
+   {
+        ROS_INFO("DJI N3/A3");
+   }
 
 }
 
@@ -107,7 +125,7 @@ bool FlightBase::setLocalPosition()
 }
 
 // checks if drone is Matrice M100.
-bool FlightBase::check_M100()
+bool FlightBase::checkM100()
 {
 
     dji_sdk::QueryDroneVersion query;

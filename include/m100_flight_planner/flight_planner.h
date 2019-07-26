@@ -3,7 +3,10 @@
 
 #include "m100_flight_planner/PID.h"
 #include "m100_flight_planner/flight_base.h"
+#include "m100_flight_planner/flight_control.h"
 #include <queue>
+#include <Eigen/Geometry>
+#include <Eigen/Dense>
 
  class FlightControl;
 
@@ -30,43 +33,48 @@ class FlightPlanner : public FlightBase
         FlightPlanner();
         ~FlightPlanner();
         void setWaypoint(sensor_msgs::NavSatFix newWaypoint); 
-        // current_atti is used to set yaw_angle for drone. Currently not needed. 
-        void step(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
-        void stepHome(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
-        void stepPID(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Quaternion &current_atti);
-        void localOffsetFromGpsOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
-        void reset(sensor_msgs::NavSatFix &current_gps, geometry_msgs::Point &current_local_pos);  
+        void step();
+        void stepHome();
+        void stepYaw();
+        void getLocalPositionOffset(geometry_msgs::Vector3&  deltaENU, sensor_msgs::NavSatFix& target, sensor_msgs::NavSatFix& origin);
+        void reset();
         bool isMissionFinished();
         bool reachedWaypoint();
         void onWaypointReached();
         void onMissionFinished();
         void runMission();
         void returnHome();
-        void prepareFlightPlan(double lat, double lon, double alt, unsigned char samplingTask);
+        void prepareFlightPlan(double lat, double lon, double alt, unsigned char sampling_task);
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);     
         void keyboardControl();
 
+        Eigen::Vector3d getEffort(Eigen::Vector3d& target);
+        Eigen::Vector3d setTarget(float x, float y, float z);
+        float setYaw(float yaw);
+
         void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
+        void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
 
 
  
    
     private:
 
+        MobileComm mobileCommManager;    
+        FlightControl flightControl;
+
         int state; // drone state
         int waypoint_index;
         int waypoint_count;
 
-        // counters for mission and home step functions
-        int outbound_counter;
-        int inbound_counter;
-        int break_counter;
+        Eigen::Vector3d target_position_vector;  // position
+        Eigen::Vector3d home_position_vector;
+        float target_yaw;
+        float current_yaw;
+        const float yaw_limit  = Deg_To_Rad(170);
+        float distance_to_setpoint;
 
-        int home_inbound_counter ;
-        int home_outbound_counter;
-        int home_break_counter ;
-    
         // get data from the android device 
         dji_sdk::MobileData data_from_mobile;
         unsigned char data_to_mobile[10];
@@ -78,16 +86,16 @@ class FlightPlanner : public FlightBase
         float target_yaw;
 
         // calculate position offsets between current position and home point.
-        float home_target_offset_x;
-        float home_target_offset_y;
-        float home_target_offset_z;
+        float home_x_offset_left;
+        float home_y_offset_left;
+        float home_z_offset_left;
         
         // drone takeoff absolute and local positions
         sensor_msgs::NavSatFix start_gps_location;
         geometry_msgs::Point start_local_position;
         sensor_msgs::NavSatFix home_start_gps_location;
         sensor_msgs::NavSatFix home_gps_location;
-        geometry_msgs::Quaternion current_drone_attitude;
+       
 
        // flight plan to store waypoints for missions
         std::vector<sensor_msgs::NavSatFix> flight_plan;
@@ -96,9 +104,9 @@ class FlightPlanner : public FlightBase
         std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > waypoint_lists;
 
         bool waypoint_finished;
-        bool obtain_control;
+        bool yaw_flag;
         bool takeoff_result;
-        bool homeReached;
+        bool home_reached;
 
         // convert data from the mobile device to waypoint and mission parameters
         unsigned char latitude_array[8] = {0};
@@ -109,7 +117,8 @@ class FlightPlanner : public FlightBase
         unsigned char task;
 
 
-        int hover_flag;
+        // for parsing the data from the mobile interface.
+        bool hover_flag;
         double latitude;
         double longitude;
         float altitude;
@@ -147,8 +156,8 @@ class FlightPlanner : public FlightBase
                                               DJISDK::HORIZONTAL_GROUND| 
                                               DJISDK::STABLE_ENABLE);  
         
-        ros::Publisher control_pub;
-        ros::Time current_time, last_time;
+        ros::Publisher control_publisher;
+        
      
 
 };

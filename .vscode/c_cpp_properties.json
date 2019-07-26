@@ -11,7 +11,8 @@
                 "/home/waffle/catkin_ws/src/Onboard-SDK-ROS/dji_sdk/include",
                 "/home/waffle/catkin_ws/src/Onboard-SDK-ROS/dji_sdk_demo/include",
                 "/usr/include",
-                "${workspaceFolder}/include"
+                "${workspaceFolder}/include",
+                "/usr/include/eigen3"
             ],
             "name": "Linux",
             "intelliSenseMode": "gcc-x64"

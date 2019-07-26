@@ -64,7 +64,6 @@ class FlightBase
         sensor_msgs::NavSatFix current_gps_location;
         geometry_msgs::Quaternion current_drone_attitude;
         uint8_t gps_health;
-        MobileComm mobileCommManager;      
         float height_above_takeoff;
         uint8_t flight_status = 255;
         uint8_t display_mode  = 255;
@@ -77,7 +76,7 @@ class FlightBase
         ~FlightBase();
 
         void activate(); // Activate the drone for SDK control
-        bool check_M100();
+        bool checkM100();
         bool obtainControl();
         bool releaseControl();
 
@@ -87,7 +86,6 @@ class FlightBase
         //void ekfOdometryCallback(const nav_msgs::Odometry::ConstPtr& msg);
         //void ekfGpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void attitudeCallback(const geometry_msgs::QuaternionStamped::ConstPtr& msg);
-        void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr& mobile_data);
         void flightStatusCallback(const std_msgs::UInt8::ConstPtr& msg);
         void displayModeCallback(const std_msgs::UInt8::ConstPtr& msg);
         void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
