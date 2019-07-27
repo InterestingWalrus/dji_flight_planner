@@ -395,17 +395,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
 FlightPlanner::~FlightPlanner()
 {
-    bool release_control = releaseControl();
-
-    if(release_control == true)
-    {
-        ROS_INFO("Program released control");
-    }
-
-    else
-    {
-        ROS_ERROR("Release Control failed!");
-    }
+   
 }
 
 void FlightPlanner::step()
