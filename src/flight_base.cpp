@@ -23,7 +23,7 @@ FlightBase::FlightBase()
    // SET Which GPS topic to subscribe to based on which drone is being used..
    // Currently can't use the same subscriber as /dji_sdk/fused_gps isn't a NAVSATFIX Type 
    //TODO To be deprecated
-   if(checkM100)
+   if(checkM100())
    {
        ROS_INFO("DJI M100");
         // gps_subscriber = nh.subscribe("/dji_sdk/gps_position", 10, &FlightPlanner::gps_callback, this);
@@ -34,6 +34,21 @@ FlightBase::FlightBase()
         ROS_INFO("DJI N3/A3");
    }
 
+}
+
+FlightBase::~FlightBase()
+{
+     bool release_control = releaseControl();
+
+    if(release_control == true)
+    {
+        ROS_INFO("Program released control");
+    }
+
+    else
+    {
+        ROS_ERROR("Release Control failed!");
+    }
 }
 
 // void FlightBase::ekfGpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)

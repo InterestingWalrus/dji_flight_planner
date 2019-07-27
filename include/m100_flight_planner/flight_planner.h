@@ -51,6 +51,7 @@ class FlightPlanner : public FlightBase
 
         Eigen::Vector3d getEffort(Eigen::Vector3d& target);
         Eigen::Vector3d setTarget(float x, float y, float z);
+        Eigen::Vector3d setHomeTarget(float x, float y, float z);
         float setYaw(float yaw);
 
         void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr& msg);
@@ -68,27 +69,17 @@ class FlightPlanner : public FlightBase
         int waypoint_index;
         int waypoint_count;
 
-        Eigen::Vector3d target_position_vector;  // position
-        Eigen::Vector3d home_position_vector;
-        float target_yaw;
-        float current_yaw;
-        const float yaw_limit  = Deg_To_Rad(170);
+        Eigen::Vector3d target_position_vector;  // position offsets between waypoints
+        Eigen::Vector3d home_position_vector;  // calculate position offsets between current position and home point.
+        float target_yaw_angle;
+        float desired_yaw_angle;
+        float current_yaw_angle;
+        const float yaw_limit  = DegToRad(170);
         float distance_to_setpoint;
 
         // get data from the android device 
         dji_sdk::MobileData data_from_mobile;
         unsigned char data_to_mobile[10];
-
-        // calculate position offsets between waypoints
-        float target_offset_x;
-        float target_offset_y;
-        float target_offset_z;
-        float target_yaw;
-
-        // calculate position offsets between current position and home point.
-        float home_x_offset_left;
-        float home_y_offset_left;
-        float home_z_offset_left;
         
         // drone takeoff absolute and local positions
         sensor_msgs::NavSatFix start_gps_location;

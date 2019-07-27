@@ -272,7 +272,7 @@ float FlightControl::computeTimeToLand()
     float current_height;
 
     // Use M100 for this
-      if(check_M100())
+      if(checkM100())
     {
       ROS_INFO("Drone is a M100 Variant");
       
