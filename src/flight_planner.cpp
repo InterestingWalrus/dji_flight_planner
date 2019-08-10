@@ -81,9 +81,15 @@ FlightPlanner::FlightPlanner()
         }
     }
 
+            // initialise PID gains. 
+    //TODO Use param server to change gains.
+    yaw_limit = DegToRad(180);
+    ROS_INFO("YAW LIMIT %f", yaw_limit );
+    
       // set initial parameters. 
 
     state = MissionState::IDLE;
+    waypoint_index = 0;
     waypoint_finished = false;
     yaw_flag = true;
     home_reached = false;
@@ -118,11 +124,12 @@ FlightPlanner::FlightPlanner()
  {
     geometry_msgs::Vector3 offset_from_home;
 
-    ROS_INFO(" HOME Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
+    ROS_INFO(" STEP Waypoint COORDINATES :  %f ,   %f", home_gps_location.latitude, home_gps_location.longitude );
 
-    getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
+    //getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
+    getLocalPositionOffset(offset_from_home, current_gps_location, home_start_gps_location);
 
-    ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+    ROS_INFO("STEP Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
 
     // pass local offsets into global variable
     double home_x_offset_left = home_position_vector[0] - offset_from_home.x;
@@ -131,17 +138,39 @@ FlightPlanner::FlightPlanner()
 
     Eigen::Vector3d effort;
     effort << home_x_offset_left, home_y_offset_left, home_z_offset_left;
+    ROS_INFO("STEP offset LEFT  x: %f y: %f z: %f ",home_x_offset_left,home_y_offset_left,home_z_offset_left);
 
     Eigen::Vector3d cmd_vector;
-    cmd_vector = getEffort(effort);
+    cmd_vector = getHomeEffort(effort);
 
-    double pid_effort = pid_pos.PIDupdate(distance_to_setpoint);
+    double pid_effort = pid_pos.PIDupdate(home_distance);
 
     double x_cmd, y_cmd, z_cmd;
 
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
-    z_cmd = pid_effort * cmd_vector[2];
+    //z_cmd = pid_effort * cmd_vector[2];
+
+     if (abs(home_z_offset_left) >= speedFactor)
+    {
+       z_cmd = (home_z_offset_left > 0 ) ? speedFactor: -1 * speedFactor;
+    }
+
+    else
+    {
+      z_cmd = home_z_offset_left;
+    }
+
+    if(home_z_offset_left > 0.5)
+    {
+        droneControlSignal(0, 0, z_cmd, 0);
+    }
+
+    else
+    {
+        droneControlSignal(x_cmd, y_cmd, 0, 0, true, true);
+    }
+    
 
     if(hover_flag)
     {
@@ -149,14 +178,15 @@ FlightPlanner::FlightPlanner()
        droneControlSignal(0,0,0,0);
 
     }
-   droneControlSignal(x_cmd, y_cmd, z_cmd, 0);
-   //ROS_INFO("Distance to setpoint: %f",distance_to_setpoint);
-   ROS_INFO("PID_Effort: %f", pid_effort);
    
-   if(distance_to_setpoint < 0.5)
+   ROS_INFO("Distance to Home setpoint: %f",home_distance);
+  // ROS_INFO("PID_Effort: %f", pid_effort);
+   
+   if(home_distance < 0.3)
    {
         ROS_INFO("We are close");
         droneControlSignal(0,0,0,0);
+        flightControl.land();
        home_reached = true;
 
       }
@@ -329,7 +359,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             home_gps_location = current_gps_location;      
             ROS_INFO("Logged home GPS location at Lat:%f , Lon:%f", home_gps_location.latitude, home_gps_location.longitude);
           
-             
+            
             // Set Home GPS Altitude as a 5 metre offset 
             //from the current take off altitude of the drone
             home_gps_location.altitude = current_gps_location.altitude +  5.0;
@@ -351,8 +381,14 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
                 if(takeoff_result)
                 {
+                     
+                    // Initialise PID 
+                    ROS_INFO("Speed Factor %f", speedFactor);
+                    pid_pos.PIDinit(0.35, 0, 0, speedFactor, -speedFactor);
+                    pid_yaw.PIDinit(0.5, 0, 0, yaw_limit, -yaw_limit);
 
                     // set first gps position
+                    setZOffset(current_local_position.z);
                     start_gps_location = current_gps_location;
                     start_local_position = current_local_position;
                     
@@ -364,10 +400,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
                     std::cout << "command: " << command << std::endl;
 
-                    // initialise PID gains. 
-                    //TODO Use param server to change gains.
-                    pid_pos.PIDinit(0.35, 0, 0, speedFactor, -speedFactor);
-                    pid_yaw.PIDinit(0.5, 0, 0, yaw_limit, -yaw_limit);
+
 
 
                     // Start Mission
@@ -391,6 +424,12 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
 
     }
 
+}
+
+void FlightPlanner::setZOffset(double offset)
+{
+     z_offset_takeoff = offset;
+     ROS_INFO("Z_offset applied as %f", z_offset_takeoff);
 }
 
 FlightPlanner::~FlightPlanner()
@@ -426,17 +465,36 @@ void FlightPlanner::step()
     double x_cmd, y_cmd, z_cmd;
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
-    z_cmd = pid_effort * cmd_vector[2];
+    //z_cmd = pid_effort * cmd_vector[2];
+
+    if (abs(z_offset_left) >= speedFactor)
+    {
+       z_cmd = (z_offset_left > 0 ) ? speedFactor: -1 * speedFactor;
+    }
+
+    else
+    {
+      z_cmd = z_offset_left;
+    }
+
+    if(z_offset_left > 0.5)
+    {
+        droneControlSignal(0, 0, z_cmd, 0);
+    }
 
     // send command to drone
-    droneControlSignal(x_cmd, y_cmd, z_cmd, 0);
-
-    ROS_INFO("PID_Effort: %f", pid_effort);
+    else
+    {
+       droneControlSignal(x_cmd, y_cmd, 0, 0);
+    }
+    
+    //ROS_INFO("PID_Effort: %f", pid_effort);
 
     // If we are close, start braking
-    if(distance_to_setpoint < 0.5)
+    if(distance_to_setpoint < 0.4)
     {
         droneControlSignal(0,0,0,0);
+        waypoint_finished = true;
     }
 
     // To play or pause mission 
@@ -475,12 +533,13 @@ void FlightPlanner::stepYaw()
 
     ROS_INFO("Current Yaw Angle %f",current_yaw_deg );
 
-    // Use Yaw angle
-    droneControlSignal(0,0,0, yaw_pid, false);
+    ROS_INFO("Yaw PID %f", yaw_pid);
 
-    // Check if we are close to the required yaw.
+    // Use Yaw angle
+    droneControlSignal(0,0,0, yaw_pid, true, true);
+        // Check if we are close to the required yaw.
     // 5 degrees is good enough for now.
-    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 5 )    
+    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 2 )    
     {
       yaw_flag = false;      
     }
@@ -506,6 +565,8 @@ Eigen::Vector3d FlightPlanner::setTarget(float x, float y, float z)
 Eigen::Vector3d FlightPlanner::setHomeTarget(float x, float y, float z)
 {
     ROS_INFO("Home point set as %f, %f, %f", x , y , z);  
+     z = z - z_offset_takeoff;
+    ROS_INFO("Removed Z Offset");
     home_position_vector << x , y , z;
 
     return home_position_vector; 
@@ -516,6 +577,27 @@ Eigen::Vector3d FlightPlanner::getEffort(Eigen::Vector3d& target)
 {
     double vector_length = target.norm();
     distance_to_setpoint = vector_length;
+
+    // Initialise unit vector
+
+    Eigen::Vector3d position_unit_vector = Eigen::Vector3d::Zero();
+
+    // check for zero magnitude
+    if(vector_length != 0)
+    {
+        // normalize vector;
+        position_unit_vector = target.normalized();
+    }
+
+    return position_unit_vector;
+
+
+}
+
+Eigen::Vector3d FlightPlanner::getHomeEffort(Eigen::Vector3d& target)
+{
+    double vector_length = target.norm();
+    home_distance = vector_length;
 
     // Initialise unit vector
 
@@ -571,23 +653,23 @@ void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt, unsign
 void FlightPlanner::droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate, bool use_ground_frame)
 {
     sensor_msgs::Joy controlPosYaw;
-
     controlPosYaw.axes.push_back(x);
     controlPosYaw.axes.push_back(y);
     controlPosYaw.axes.push_back(z);
     controlPosYaw.axes.push_back(yaw);
+
 
     if(use_yaw_rate && use_ground_frame) // using yaw rate and ground frame
     {
         controlPosYaw.axes.push_back(control_flag); 
     }
 
-    else if (use_yaw_rate) // using yaw rate and body frame
+   if (use_yaw_rate) // using yaw rate and body frame
     {
          controlPosYaw.axes.push_back(control_flag_fru); 
     }
 
-    else if (use_ground_frame) // using yaw angle and ground frame
+    if (!use_yaw_rate && use_ground_frame) // using yaw angle and ground frame
     {
          controlPosYaw.axes.push_back(control_flag_yaw_angle_enu); 
     }
@@ -894,15 +976,15 @@ void FlightPlanner::runMission()
                 if(!reachedWaypoint())
                 {
                     // YAW 
-                    if(yaw_flag)
-                    {
-                        stepYaw();
-                    }
+                    // if(yaw_flag)
+                    // {
+                    //     stepYaw();
+                    // }
 
-                    if(!yaw_flag)
-                    {
+                   // if(!yaw_flag)
+                   // {
                          step();
-                    }
+                   // }
 
                    
                 }
@@ -949,22 +1031,11 @@ void FlightPlanner::runMission()
 
                 switch(checkMissionEnd)
                 {
-
-                     
-                    case 3:
+                    case 1:
                     {
+                         droneControlSignal(0, 0, 0, 0, true, true);
+                         break;
 
-                        ROS_INFO("Computing home offsets");
-                        geometry_msgs::Vector3 offset_from_home;
-                        ROS_INFO(" HOME Waypoint COORDINATES :  %f ,  %f, %f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude );
-                         getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
-                        ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
-                    
-                        setHomeTarget(offset_from_home.x, offset_from_home.y, offset_from_home.z);
-
-                        home_start_gps_location = current_gps_location;                     
-                        state = MissionState::GO_HOME;
-                      break;
                     }
 
                     case 2:
@@ -974,11 +1045,22 @@ void FlightPlanner::runMission()
                         break;
                     }
 
-                    case 1:
+                     
+                    case 3:
                     {
-                         droneControlSignal(0, 0, 0, 0, true, true);
 
-                    }
+                        ROS_INFO("Computing home offsets");
+                        geometry_msgs::Vector3 offset_from_home;
+                        ROS_INFO(" HOME Waypoint COORDINATES :  %f ,  %f, %f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude );
+                        getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
+                        ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+                    
+                        setHomeTarget(offset_from_home.x, offset_from_home.y, offset_from_home.z);
+
+                        home_start_gps_location = current_gps_location;                     
+                        state = MissionState::GO_HOME;
+                      break;
+                    }              
 
                     default:
                     {
@@ -996,6 +1078,7 @@ void FlightPlanner::runMission()
                if(!home_reached)
                {
 
+                    // returnHome();
                     stepHome();
                    
                }

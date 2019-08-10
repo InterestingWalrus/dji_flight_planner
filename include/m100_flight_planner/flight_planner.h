@@ -48,8 +48,10 @@ class FlightPlanner : public FlightBase
         void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);     
         void keyboardControl();
+        void setZOffset(double offset);
 
         Eigen::Vector3d getEffort(Eigen::Vector3d& target);
+        Eigen::Vector3d getHomeEffort(Eigen::Vector3d& target);
         Eigen::Vector3d setTarget(float x, float y, float z);
         Eigen::Vector3d setHomeTarget(float x, float y, float z);
         float setYaw(float yaw);
@@ -74,8 +76,10 @@ class FlightPlanner : public FlightBase
         float target_yaw_angle;
         float desired_yaw_angle;
         float current_yaw_angle;
-        const float yaw_limit  = DegToRad(170);
+        double z_offset_takeoff;
+        float yaw_limit;
         float distance_to_setpoint;
+        float home_distance;
 
         // get data from the android device 
         dji_sdk::MobileData data_from_mobile;
