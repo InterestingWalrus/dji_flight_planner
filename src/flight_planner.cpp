@@ -182,7 +182,7 @@ FlightPlanner::FlightPlanner()
    ROS_INFO("Distance to Home setpoint: %f",home_distance);
   // ROS_INFO("PID_Effort: %f", pid_effort);
    
-   if(home_distance < 0.3)
+   if(home_distance <= 1)
    {
         ROS_INFO("We are close");
         droneControlSignal(0,0,0,0);
@@ -515,15 +515,20 @@ void FlightPlanner::stepYaw()
 
     double x_offset_left = target_position_vector[0] - position_offset.x;
     double y_offset_left = target_position_vector[1] - position_offset.y;
-    double z_offset_left = target_position_vector[2] - position_offset.z;
 
        
     current_yaw_angle = toEulerAngle(current_drone_attitude).z;
 
+    current_yaw_angle = (current_yaw_angle>=0) ? current_yaw_angle : current_yaw_angle + 2*C_PI;
+
     desired_yaw_angle = atan2(y_offset_left, x_offset_left);
 
+    desired_yaw_angle = (desired_yaw_angle>=0) ? desired_yaw_angle : desired_yaw_angle + 2*C_PI;
+
+    double yaw_diff = desired_yaw_angle - current_yaw_angle;
+
    // Yaw pid to be published to control signal.
-    double yaw_pid = pid_yaw.PIDupdate(desired_yaw_angle);
+    double yaw_pid = pid_yaw.PIDupdate(yaw_diff);
 
     double desired_yaw_angle_deg = RadToDeg(desired_yaw_angle) ;
 
@@ -539,7 +544,7 @@ void FlightPlanner::stepYaw()
     droneControlSignal(0,0,0, yaw_pid, true, true);
         // Check if we are close to the required yaw.
     // 5 degrees is good enough for now.
-    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 2 )    
+    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 0.1 )    
     {
       yaw_flag = false;      
     }
@@ -976,15 +981,15 @@ void FlightPlanner::runMission()
                 if(!reachedWaypoint())
                 {
                     // YAW 
-                    // if(yaw_flag)
-                    // {
-                    //     stepYaw();
-                    // }
+                     if(yaw_flag)
+                     {
+                         stepYaw();
+                     }
 
-                   // if(!yaw_flag)
-                   // {
+                     if(!yaw_flag)
+                     {
                          step();
-                   // }
+                     }
 
                    
                 }
@@ -1027,12 +1032,15 @@ void FlightPlanner::runMission()
 
             case MissionState::FINISHED:
             {
-                ros::Duration(0.5).sleep();
+                ros::Duration(0.1).sleep();
+
+                ROS_INFO ("Drone is case %d", checkMissionEnd);
 
                 switch(checkMissionEnd)
                 {
                     case 1:
                     {
+                         ROS_INFO("Hovering at position ");
                          droneControlSignal(0, 0, 0, 0, true, true);
                          break;
 
@@ -1058,7 +1066,14 @@ void FlightPlanner::runMission()
                         setHomeTarget(offset_from_home.x, offset_from_home.y, offset_from_home.z);
 
                         home_start_gps_location = current_gps_location;                     
-                        state = MissionState::GO_HOME;
+                        //state = MissionState::GO_HOME;
+                        if(!home_reached)
+                         {
+
+                         // returnHome();
+                            stepHome();
+                   
+                         }
                       break;
                     }              
 
@@ -1072,19 +1087,19 @@ void FlightPlanner::runMission()
 
             }
 
-            case MissionState::GO_HOME:
-            {
+            // case MissionState::GO_HOME:
+            // {
 
-               if(!home_reached)
-               {
+            //    if(!home_reached)
+            //    {
 
-                    // returnHome();
-                    stepHome();
+            //         // returnHome();
+            //         stepHome();
                    
-               }
-                break;
+            //    }
+            //     break;
 
-            }
+            // }
 
 
             default:
