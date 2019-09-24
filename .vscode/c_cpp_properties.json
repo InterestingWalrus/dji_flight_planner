@@ -6,10 +6,9 @@
                 "limitSymbolsToIncludedHeaders": true
             },
             "includePath": [
-                "/home/waffle/catkin_ws/devel/include",
-                "/opt/ros/melodic/include",
-                "/home/waffle/catkin_ws/src/Onboard-SDK-ROS/dji_sdk/include",
-                "/home/waffle/catkin_ws/src/Onboard-SDK-ROS/dji_sdk_demo/include",
+                "~/phocoena_ws/devel/include",
+                "/opt/ros/kinetic/include",
+                "~/phocoena_ws/src/Onboard-SDK-ROS/dji_sdk/include",
                 "/usr/include",
                 "${workspaceFolder}/include",
                 "/usr/include/eigen3"

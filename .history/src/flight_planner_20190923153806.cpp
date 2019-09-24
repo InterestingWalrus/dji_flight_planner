@@ -151,7 +151,7 @@ FlightPlanner::FlightPlanner()
     y_cmd = pid_effort * cmd_vector[1];
     z_cmd = pid_effort * cmd_vector[2];
 
-    if(home_z_offset_left > 0.2)
+    if(home_z_offset_left < 0.2)
     {
         droneControlSignal(0, 0, z_cmd, 0);
     }
@@ -376,8 +376,8 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                      
                     // Initialise PID 
                     ROS_INFO("Speed Factor %f", speedFactor);
-                    pid_pos.PIDinit(0.5, 0, 0, speedFactor, -speedFactor);
-                    pid_yaw.PIDinit(1, 0, 0, yaw_limit, -yaw_limit);
+                    pid_pos.PIDinit(0.35, 0, 0, speedFactor, -speedFactor);
+                    pid_yaw.PIDinit(0.5, 0, 0, yaw_limit, -yaw_limit);
 
                     // set first gps position
                     if(drone_version)
@@ -460,7 +460,17 @@ void FlightPlanner::step()
     y_cmd = pid_effort * cmd_vector[1];
     z_cmd = pid_effort * cmd_vector[2];
 
-    if(z_offset_left > 0.2)
+    // if (abs(z_offset_left) >= speedFactor)
+    // {
+    //    z_cmd = (z_offset_left > 0 ) ? speedFactor: -1 * speedFactor;
+    // }
+
+    // else
+    // {
+    //   z_cmd = z_offset_left;
+    // }
+
+    if(z_offset_left > 0.5)
     {
         droneControlSignal(0, 0, z_cmd, 0);
     }
@@ -486,6 +496,8 @@ void FlightPlanner::step()
     {
        droneControlSignal(0,0,0,0);
     }
+
+
 
 }
 
@@ -524,8 +536,9 @@ void FlightPlanner::stepYaw()
 
     // Use Yaw angle
     droneControlSignal(0,0,0, yaw_pid, true, true);
-    // Check if we are close to the required yaw.
-    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 0.9 )    
+        // Check if we are close to the required yaw.
+    // 5 degrees is good enough for now.
+    if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 0.5 )    
     {
       yaw_flag = false;      
     }
@@ -892,21 +905,23 @@ void FlightPlanner::onWaypointReached()
                 {
                    ROS_INFO("in landing loop");
                     
-                    // if(waypoint_lists.size()== 1 && checkMissionEnd == 3) // if we need to fly back home
-                    // {
-                    //     // You still want to do your mission here.
-                    //      ros::Duration(0.1).sleep();
-                    //     ROS_INFO("Drone now Taking off to RTH");
-                    //      flightControl.monitoredTakeoff();
-                    // }
 
-                   // else
-                   // {
-                        ROS_INFO("Drone Entering Sleeep");
+                     if(waypoint_lists.size()> 1 ) // Only take off if we're not at the last waypoint and mission end is to autoland
+                    {
+                         flightControl.monitoredTakeoff();
+                    
+                    }
+
+                    if(waypoint_lists.size()== 1 && checkMissionEnd == 3) // if we need to fly back home
+                    {
+                        ROS_INFO("Drone now Taking off to RTH");
+                         flightControl.monitoredTakeoff();
+                    }
+
+                    else
+                    {
                         ros::Duration(10).sleep();
-                        ROS_INFO("Drone Exited Sleeep");
-                        flightControl.monitoredTakeoff();
-                   // }
+                    }
                    
                 }           
                
@@ -1076,11 +1091,11 @@ void FlightPlanner::runMission()
                     case 3:
                     {
 
-                       // ROS_INFO("Computing home offsets");
+                        ROS_INFO("Computing home offsets");
                         geometry_msgs::Vector3 offset_from_home;
-                       // ROS_INFO(" HOME Waypoint COORDINATES :  %f ,  %f, %f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude );
-                       getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
-                        //ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
+                        ROS_INFO(" HOME Waypoint COORDINATES :  %f ,  %f, %f ", home_gps_location.latitude, home_gps_location.longitude, home_gps_location.altitude );
+                        getLocalPositionOffset(offset_from_home, home_gps_location, current_gps_location );
+                        ROS_INFO("HOME Waypoint target offset  x: %f y: %f z: %f ", offset_from_home.x, offset_from_home.y, offset_from_home.z);
                     
                         setHomeTarget(offset_from_home.x, offset_from_home.y, offset_from_home.z);
 
@@ -1089,10 +1104,8 @@ void FlightPlanner::runMission()
                         if(!home_reached)
                          {
                             stepHome();
-                            
+                            ROS_INFO("Home reached %d", home_reached);
                          }
-
-                         ROS_INFO("Home reached %d", home_reached);
 
                       break;
                     }              

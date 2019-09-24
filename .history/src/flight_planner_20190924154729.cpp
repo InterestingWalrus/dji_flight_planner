@@ -376,7 +376,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                      
                     // Initialise PID 
                     ROS_INFO("Speed Factor %f", speedFactor);
-                    pid_pos.PIDinit(0.5, 0, 0, speedFactor, -speedFactor);
+                    pid_pos.PIDinit(1.0, 0, 0, speedFactor, -speedFactor);
                     pid_yaw.PIDinit(1, 0, 0, yaw_limit, -yaw_limit);
 
                     // set first gps position
@@ -524,7 +524,8 @@ void FlightPlanner::stepYaw()
 
     // Use Yaw angle
     droneControlSignal(0,0,0, yaw_pid, true, true);
-    // Check if we are close to the required yaw.
+        // Check if we are close to the required yaw.
+    // 5 degrees is good enough for now.
     if(fabs(desired_yaw_angle_deg - current_yaw_deg) < 0.9 )    
     {
       yaw_flag = false;      

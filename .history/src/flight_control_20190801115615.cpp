@@ -155,6 +155,7 @@ bool FlightControl::monitoredLanding() // WOrk on this later......
   ros::Duration(0.01).sleep();
   ros::spinOnce();
 
+  // Step 1.1: landDrone
   while (flight_status != DJISDK::FlightStatus::STATUS_ON_GROUND &&
          display_mode != DJISDK::DisplayMode::MODE_AUTO_LANDING &&
          ros::Time::now() - start_time < ros::Duration(N3_land)) {
@@ -280,6 +281,7 @@ float FlightControl::computeTimeToLand()
       timeToLand = (current_height / droneLandSpeed) ;
 
       // Maximum time M100 drone will take to land from an altitude of 100 metres is 55 seconds.. 
+      // TODO: Test A3/N3 Time. 
       // Tested in simulator
       //TODO use Velocity Z to compute variable time to land)
 
@@ -316,7 +318,7 @@ float FlightControl::computeTimeToLand()
         timeToLand = 0;
       }
 
-    // empirically, time to land from the N3 is 90 seconds.
+    // empirically time to land from the N3 is 90 seconds.
     // so cap time to land to 90 seconds
 
      if(timeToLand > 90)

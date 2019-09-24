@@ -376,7 +376,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
                      
                     // Initialise PID 
                     ROS_INFO("Speed Factor %f", speedFactor);
-                    pid_pos.PIDinit(0.5, 0, 0, speedFactor, -speedFactor);
+                    pid_pos.PIDinit(1.0, 0, 0, speedFactor, -speedFactor);
                     pid_yaw.PIDinit(1, 0, 0, yaw_limit, -yaw_limit);
 
                     // set first gps position
