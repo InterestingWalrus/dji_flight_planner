@@ -19,6 +19,7 @@
 #include <dji_sdk/SetLocalPosRef.h>
 //#include <dji_sdk/FusedGps.h>
 #include "dji_sdk/dji_sdk.h"
+//#include <djiosdk/dji_flight_controller.hpp>
 #include <djiosdk/dji_vehicle.hpp>
 #include <dji_sdk/dji_sdk_node.h>
 
@@ -63,6 +64,7 @@ class FlightBase
         geometry_msgs::Point current_local_position;
         sensor_msgs::NavSatFix current_gps_location;
         geometry_msgs::Quaternion current_drone_attitude;
+        //DJI::OSDK::FlightController flightController;
         uint8_t gps_health;
         float height_above_takeoff;
         uint8_t flight_status = 255;

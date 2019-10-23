@@ -4,9 +4,11 @@
 #include "m100_flight_planner/PID.h"
 #include "m100_flight_planner/flight_base.h"
 #include "m100_flight_planner/flight_control.h"
+
 #include <queue>
 #include <Eigen/Geometry>
 #include <Eigen/Dense>
+#include <tuple>
 
  class FlightControl;
 
@@ -44,8 +46,10 @@ class FlightPlanner : public FlightBase
         void onMissionFinished();
         void runMission();
         void returnHome();
-        void prepareFlightPlan(double lat, double lon, double alt, unsigned char sampling_task);
-        void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land);
+        void prepareFlightPlan(double lat, double lon, double alt, unsigned char sampling_task, float samplingTime);
+       
+        void appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land, float samplingTime);
+        
         void droneControlSignal(double x, double y, double z, double yaw, bool use_yaw_rate = true, bool use_ground_frame = true);     
         void keyboardControl();
         void setZOffset(double offset);
@@ -97,7 +101,9 @@ class FlightPlanner : public FlightBase
         std::vector<sensor_msgs::NavSatFix> flight_plan;
 
        // check if landing is required at the waypoint
-        std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > waypoint_lists;
+       // std::queue< std::pair < std::vector<sensor_msgs::NavSatFix> , unsigned char > > waypoint_lists;
+
+        std::queue< std::tuple < std::vector<sensor_msgs::NavSatFix> , unsigned char, float > > waypoint_lists;
 
         bool waypoint_finished;
         bool yaw_flag;
@@ -109,16 +115,18 @@ class FlightPlanner : public FlightBase
         unsigned char longitude_array[8] = {0};
         unsigned char altitude_array[4] = {0};
         unsigned char speed_array[4] = {0};
+        unsigned char sampling_time_array[4] = {0};
         unsigned char missionEnd = 0;
         unsigned char task;
 
 
         // for parsing the data from the mobile interface.
-        bool hover_flag;
+        bool hover_flag = 0;
         double latitude;
         double longitude;
         float altitude;
         float speedFactor;
+        float samplingTime;
         int checkMissionEnd;
         std::string command;
     

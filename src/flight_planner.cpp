@@ -5,6 +5,13 @@ float kp;
 float ki; 
 float kd;
 
+ int inbound_counter;
+  int outbound_counter;
+  int break_counter;
+
+  ros::Publisher ctrlBrakePub;
+  ros::Publisher ctrlPosYawPub;
+
 char getch()
 {
      int flags = fcntl(0, F_GETFL, 0);
@@ -66,6 +73,15 @@ FlightPlanner::FlightPlanner()
     bool obtain_control;
 
     control_publisher = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
+
+    // Publish the control signal
+  ctrlPosYawPub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_ENUposition_yaw", 10);
+  
+  // We could use dji_sdk/flight_control_setpoint_ENUvelocity_yawrate here, but
+  // we use dji_sdk/flight_control_setpoint_generic to demonstrate how to set the flag
+  // properly in function Mission::step()
+  ctrlBrakePub = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
+  
     
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
@@ -214,22 +230,31 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             }
 
              task = data_from_mobile.data[21];
+
+             for(int i = 0; i < sizeof(sampling_time_array); i++)
+             {
+                 sampling_time_array [i] = data_from_mobile.data[i+22];
+             }
+             
    
 
 
             std::reverse(std::begin(latitude_array), std::end(latitude_array));
             std::reverse(std::begin(longitude_array), std::end(longitude_array));
             std::reverse(std::begin(altitude_array), std::end(altitude_array));
+            std::reverse(std::begin(sampling_time_array), std::end(sampling_time_array));
 
-            std::memcpy(&latitude, latitude_array, sizeof (double));
-            std::memcpy(&longitude, longitude_array, sizeof (double));
+            std::memcpy(&latitude, latitude_array, sizeof(double));
+            std::memcpy(&longitude, longitude_array, sizeof(double));
             std::memcpy(&altitude, altitude_array, sizeof(float));
+            std::memcpy(&samplingTime, sampling_time_array, sizeof(float));
 
 
-            std::cout<< "Sampling at Waypoint:" << static_cast<unsigned>(task) << std::endl;
+            std::cout<< "Sampling at Waypoint for " << samplingTime << "seconds"  << std::endl;
 
             // Add waypoint to flight plan
-            prepareFlightPlan(latitude, longitude, altitude, task);
+            prepareFlightPlan(latitude, longitude, altitude, task, samplingTime);
+             //prepareFlightPlan(latitude, longitude, altitude, task);
            break;
 
        }
@@ -434,34 +459,46 @@ void FlightPlanner::step()
 {
     geometry_msgs::Vector3 position_offset;
 
-    // Compute the local position delta from the current waypoint to the next waypoint
-    getLocalPositionOffset(position_offset, current_gps_location, start_gps_location);
+     // Compute the local position delta from the current waypoint to the next waypoint
+      getLocalPositionOffset(position_offset, current_gps_location, start_gps_location);
 
     
     double x_offset_left = target_position_vector[0] - position_offset.x;
     double y_offset_left = target_position_vector[1] - position_offset.y;
     double z_offset_left = target_position_vector[2] - position_offset.z;
 
-    Eigen::Vector3d effort;
+    //ROS_INFO("Z_offset_left: %f", z_offset_left );
+    //ROS_INFO("y offset_left: %f", y_offset_left );
+    //ROS_INFO("x_offset_left: %f", x_offset_left );
+     Eigen::Vector3d effort;
 
-    effort << x_offset_left, y_offset_left, z_offset_left;
+     effort << x_offset_left, y_offset_left, z_offset_left;
 
-    // To be used to set velocities on the UAV
-    Eigen::Vector3d cmd_vector;
+     // To be used to set velocities on the UAV
+     Eigen::Vector3d cmd_vector;
 
-    cmd_vector = getEffort(effort);
+     cmd_vector = getEffort(effort);
     
-    // Determine the UAV speed
-    double pid_effort = pid_pos.PIDupdate(distance_to_setpoint);
+     // Determine the UAV speed
+     double pid_effort = pid_pos.PIDupdate(distance_to_setpoint);
 
-    // commands to be sent to control publisher
-    double x_cmd, y_cmd, z_cmd;
-    x_cmd = pid_effort * cmd_vector[0];
-    y_cmd = pid_effort * cmd_vector[1];
-    z_cmd = pid_effort * cmd_vector[2];
+     // commands to be sent to control publisher
+     double x_cmd, y_cmd, z_cmd;
+     x_cmd = pid_effort * cmd_vector[0];
+     y_cmd = pid_effort * cmd_vector[1];
+     z_cmd = pid_effort * cmd_vector[2];
+
+        
 
     if(z_offset_left > 0.2)
     {
+        ROS_INFO("Enter Z offset %f",z_cmd);
+        // controlVelYawRate.axes.push_back(0);
+        //  controlVelYawRate.axes.push_back(0);
+        // controlVelYawRate.axes.push_back(z_cmd);
+        //  controlVelYawRate.axes.push_back(0);
+        // controlVelYawRate.axes.push_back(flag);
+        //  ctrlBrakePub.publish(controlVelYawRate);
         droneControlSignal(0, 0, z_cmd, 0);
     }
 
@@ -471,8 +508,8 @@ void FlightPlanner::step()
        droneControlSignal(x_cmd, y_cmd, 0, 0);
     }
     
-    ROS_INFO("PID_Effort: %f", pid_effort);
-    ROS_INFO("Setpoint distance: %f", distance_to_setpoint);
+//    // ROS_INFO("PID_Effort: %f", pid_effort);
+//    // ROS_INFO("Setpoint distance: %f", distance_to_setpoint);
 
     // If we are close, start braking
     if(distance_to_setpoint < 0.5)
@@ -484,10 +521,13 @@ void FlightPlanner::step()
     // To play or pause mission 
     if(hover_flag == true)
     {
+        ROS_INFO("Hover Flag");
        droneControlSignal(0,0,0,0);
     }
 
 }
+
+
 
 void FlightPlanner::stepYaw()
 {
@@ -605,22 +645,24 @@ Eigen::Vector3d FlightPlanner::getHomeEffort(Eigen::Vector3d& target)
 
 
 }
-void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt, unsigned char sampling_task)
+void FlightPlanner::prepareFlightPlan(double lat, double lon, double alt, unsigned char sampling_task, float samplingTime)
 {
     float altitude_offset = current_gps_location.altitude;
     sensor_msgs::NavSatFix flightWaypoint;
     flightWaypoint.latitude = lat;
     flightWaypoint.longitude = lon;
     flightWaypoint.altitude =  alt + altitude_offset; // add the UAV mission altitude offset from the ground to the drone's altitude
-    unsigned char land = sampling_task;
-
+    
     ROS_INFO("Atitude offset for waypoint %d set as %f, drone altitude is now at %f", waypoint_index, altitude_offset, flightWaypoint.altitude);
+     ROS_INFO("Latitude: %f, Longitude: %f", flightWaypoint.latitude, flightWaypoint.longitude);
+
 
     // Add UAV Waypoint to the 
-    appendFlightPlan(flightWaypoint, sampling_task);
+    appendFlightPlan(flightWaypoint, sampling_task, samplingTime);
 
     
 }
+
 
  bool FlightPlanner::isMissionFinished()
  {
@@ -705,7 +747,7 @@ bool FlightPlanner::reachedWaypoint()
 
 }
 
-void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land)
+void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigned char land, float samplingTime)
 {
 
     // add new waypoint to vector
@@ -713,12 +755,22 @@ void FlightPlanner::appendFlightPlan(sensor_msgs::NavSatFix newWaypoint, unsigne
 
     // update number of waypoints
     waypoint_count = flight_plan.size();
-
-    waypoint_lists.push(make_pair(flight_plan, land));
+        
+    waypoint_lists.push(std::make_tuple(flight_plan, land, samplingTime));
+   // waypoint_lists.push(make_pair(flight_plan, land));
 
     ROS_INFO("Waypoint # %d added", waypoint_count);
+    auto data = waypoint_lists.front();
+    std::vector<sensor_msgs::NavSatFix> GPS = std::get<0>(data);
+    unsigned char checkTask = std::get<1>(data);
+    float sampleTime = std::get<2>(data);
 
-    ROS_INFO ("Landing Task %d", land);
+
+
+
+    ROS_INFO ("Landing Task %d", checkTask);
+     ROS_INFO ("Landing Task %f", sampleTime);
+     ROS_INFO("Waypoint Lat: %f, Lon%f: ", GPS.front().latitude, GPS.front().longitude);
 
 }
 
@@ -836,13 +888,11 @@ void FlightPlanner::flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr
 void FlightPlanner::onWaypointReached()
 { 
     // check if we are to land at the waypoint. 
-    unsigned char checkTask = waypoint_lists.front().second;
+     //unsigned char checkTask = waypoint_lists.front().second;
+    auto waypoint_settings = waypoint_lists.front();
+    unsigned char checkTask = std::get<1>(waypoint_settings);
+    float sampleTime = std::get<2>(waypoint_settings);
 
-    //  if(pid_flag)
-    //     {
-    //        flightControl.set_local_position();
-    //        ROS_INFO("Worked");
-    //     }
     
     if(!waypoint_lists.empty())
     {   
@@ -874,7 +924,8 @@ void FlightPlanner::onWaypointReached()
 
                 if(drone_version)
                 {
-                     ros::Duration(2).sleep();
+                    ROS_INFO("Sleep time is %f", sampleTime);
+                     ros::Duration(sampleTime).sleep();
                     
                     if(waypoint_lists.size()> 1) // Only take off if we're not at the last waypoint and mission end is to autoland
                     {
@@ -892,21 +943,10 @@ void FlightPlanner::onWaypointReached()
                 {
                    ROS_INFO("in landing loop");
                     
-                    // if(waypoint_lists.size()== 1 && checkMissionEnd == 3) // if we need to fly back home
-                    // {
-                    //     // You still want to do your mission here.
-                    //      ros::Duration(0.1).sleep();
-                    //     ROS_INFO("Drone now Taking off to RTH");
-                    //      flightControl.monitoredTakeoff();
-                    // }
-
-                   // else
-                   // {
-                        ROS_INFO("Drone Entering Sleeep");
-                        ros::Duration(10).sleep();
+                       ROS_INFO("Sleep time is %f", sampleTime);
+                        ros::Duration(sampleTime).sleep();
                         ROS_INFO("Drone Exited Sleeep");
                         flightControl.monitoredTakeoff();
-                   // }
                    
                 }           
                
@@ -991,15 +1031,15 @@ void FlightPlanner::runMission()
                 if(!reachedWaypoint())
                 {
                     // YAW 
-                     if(yaw_flag)
-                     {
-                         stepYaw();
-                     }
+                      if(yaw_flag)
+                      {
+                          stepYaw();
+                      }
 
-                     if(!yaw_flag)
-                     {
+                      if(!yaw_flag)
+                      {
                          step();
-                     }
+                      }
 
                    
                 }
