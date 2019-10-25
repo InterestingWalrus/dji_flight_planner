@@ -1,0 +1,6 @@
+<launch>
+
+  <node pkg = "rosbag" type="record" name="dji_rosbag" output="screen"
+   args="-o /tmp/hrp2-diag /diagnostics /rosout" />
+
+</launch>
