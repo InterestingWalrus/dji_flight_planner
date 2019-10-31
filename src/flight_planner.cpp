@@ -833,11 +833,13 @@ void FlightPlanner::onWaypointReached()
 
                     if (waypoint_lists.size() > 1) // Only take off if we're not at the last waypoint and mission end is to autoland
                     {
+                        verti_control = 1;
                         flightControl.M100monitoredTakeoff();
                     }
 
                     if (waypoint_lists.size() == 1 && checkMissionEnd == 3) // if we need to fly back home
                     {
+                        verti_control = 1;
                         flightControl.M100monitoredTakeoff();
                     }
                 }
@@ -848,6 +850,7 @@ void FlightPlanner::onWaypointReached()
                     ROS_INFO("Sleep time is %f", sampleTime);
                     ros::Duration(sampleTime).sleep();
                     ROS_INFO("Drone Exited Sleeep");
+                    verti_control = 1;
                     flightControl.monitoredTakeoff();
                 }
             }
