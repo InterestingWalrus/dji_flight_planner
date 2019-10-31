@@ -375,14 +375,21 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             start_local_position = current_local_position;
 
             // Wait for Keyboard Press
-            ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
+            //ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
 
-            std::cin.clear();
-            std::cin >> command;
-            std::cout << "command: " << command << std::endl;
+           // std::cin.clear();
+           // std::cin >> command;
+          //  std::cout << "command: " << command << std::endl;
 
             // Start Mission
-            while (ros::ok() && command == "c")
+            // while (ros::ok() && command == "c")
+            // {
+            //     ros::spinOnce();
+            //     runMission();
+            //     loop_rate.sleep();
+            // }
+
+             while (ros::ok())
             {
                 ros::spinOnce();
                 runMission();
