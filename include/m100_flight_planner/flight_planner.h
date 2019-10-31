@@ -61,6 +61,8 @@ private:
     FlightControl flightControl;
 
     int state; // drone state
+
+    int verti_control;
     int waypoint_index;
     int waypoint_count;
 

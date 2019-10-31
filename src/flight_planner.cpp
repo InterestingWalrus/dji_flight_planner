@@ -107,6 +107,7 @@ FlightPlanner::FlightPlanner()
     speed_array[4] = {0};
     missionEnd = 0;
     hover_flag = 0;
+    verti_control = 1;
 }
 
 void FlightPlanner::stepHome()
@@ -361,7 +362,7 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             // Initialise PID
             //TODO: Set different gains for both drones
             ROS_INFO("Speed Factor %f", speedFactor);
-            pid_pos.PIDinit(0.5, 0, 0.05, speedFactor, -speedFactor);
+            pid_pos.PIDinit(1.5, 0, 0.05, speedFactor, -speedFactor);
             pid_yaw.PIDinit(1, 0, 0, yaw_limit, -yaw_limit);
 
             // set first gps position
@@ -442,7 +443,7 @@ void FlightPlanner::step()
     z_cmd = pid_effort * cmd_vector[2];
 
     // Wait for UAV to gain required altitude
-    if (z_offset_left > 0.2)
+    if (verti_control == 1 && z_offset_left > 0.5)
     {
         ROS_INFO("Enter Z offset %f", z_cmd);
         droneControlSignal(0, 0, z_cmd, 0);
@@ -451,6 +452,7 @@ void FlightPlanner::step()
     // send X,Y command to UAV
     else
     {
+        verti_control = 0;
         droneControlSignal(x_cmd, y_cmd, 0, 0);
     }
 
