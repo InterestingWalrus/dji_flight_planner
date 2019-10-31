@@ -374,27 +374,22 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             start_gps_location = current_gps_location;
             start_local_position = current_local_position;
 
-            // Wait for Keyboard Press
-            //ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
+            //Wait for Keyboard Press
+            ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
 
-           // std::cin.clear();
-           // std::cin >> command;
-          //  std::cout << "command: " << command << std::endl;
+           std::cin.clear();
+           std::cin >> command;
+           std::cout << "command: " << command << std::endl;
 
-            // Start Mission
-            // while (ros::ok() && command == "c")
-            // {
-            //     ros::spinOnce();
-            //     runMission();
-            //     loop_rate.sleep();
-            // }
-
-             while (ros::ok())
+            //Start Mission
+            while (ros::ok() && command == "c")
             {
                 ros::spinOnce();
                 runMission();
                 loop_rate.sleep();
             }
+
+        
         }
 
         break;
@@ -447,7 +442,11 @@ void FlightPlanner::step()
     double x_cmd, y_cmd, z_cmd;
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
-    z_cmd = pid_effort * cmd_vector[2];
+    //z_cmd = pid_effort * cmd_vector[2];
+    if (abs(z_cmd) >= speedFactor)
+    z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
+  else
+    z_cmd = z_cmd;
 
     // Wait for UAV to gain required altitude
     if (verti_control == 1 && z_offset_left > 0.5)
