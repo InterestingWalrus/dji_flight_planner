@@ -86,6 +86,32 @@ FlightPlanner::FlightPlanner()
         }
     }
 
+    try
+    {
+    
+       // ser_object.setPort("/dev/ttyACMO");
+       // ser_object.setBaudrate(115200);
+       // serial::Timeout to = serial::Timeout::simpleTimeout(1000);
+      //  ser_object.setTimeout(to);
+       // ser_object.open();
+
+    }
+    catch(const std::exception& e)
+    {
+         ROS_ERROR("Unable to open Serial Port");
+    }
+
+    // if(ser_object.isOpen())
+    // {
+    //     ROS_INFO("Serial Port Initialised");
+    // }
+
+    // else
+    // {
+    //       ROS_ERROR("Serial Port not Initialised");
+
+    // }
+
     //TODO Use param server to change gains.
     yaw_limit = DegToRad(180);
     ROS_INFO("YAW LIMIT %f", yaw_limit);
@@ -443,14 +469,18 @@ void FlightPlanner::step()
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
     //z_cmd = pid_effort * cmd_vector[2];
-    if (abs(z_cmd) >= speedFactor)
-    z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
-  else
-    z_cmd = z_cmd;
-
+     if (abs(z_cmd) >= speedFactor)
+     {
+     z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
+     }
+   else
+   {
+     z_cmd = z_offset_left;
+   }
     // Wait for UAV to gain required altitude
-    if (verti_control == 1 && z_offset_left > 0.5)
+    if (verti_control == 1 && z_offset_left > 0.1)
     {
+        ROS_INFO("SPeed: %f", speedFactor);
         ROS_INFO("Enter Z offset %f", z_cmd);
         droneControlSignal(0, 0, z_cmd, 0);
     }
@@ -469,6 +499,7 @@ void FlightPlanner::step()
     if (distance_to_setpoint < 0.5)
     {
         droneControlSignal(0, 0, 0, 0);
+        ROS_INFO("Setpoint");
         waypoint_finished = true;
     }
 
@@ -831,11 +862,29 @@ void FlightPlanner::onWaypointReached()
                 // Pause for a period of time here...
                 // Integrate whatever task we're doing at this point.
                 // TODO iintegrate UART_START_DMA Here.
+                //unsigned char record_time[sizeof(sampleTime)];
+                // Send command to record data here
+                //daq_data[0] = 0x35;
+                //daq_data[1] = 0x4D;
+                // cast sample time to an integer here.
+                //memcpy(&daq_data[2], &sampleTime, sizeof(float));
+                //ser_object.write(daq_data, 6);
 
                 if (drone_version)
-                {
+                {                   
                     ROS_INFO("Sleep time is %f", sampleTime);
                     ros::Duration(sampleTime).sleep();
+
+                    //  daq_data[0] = 0x33;
+                    //  daq_data[1] = 0x33;
+                    //  daq_data[2] = 0x0;
+                    //  daq_data[3] = 0x0;
+                    //  daq_data[4] = 0x0;
+                    //  daq_data[5] = 0x0; 
+                    //  // Send command to stop recording.
+                    // ser_object.write(daq_data, 6);
+
+
 
                     if (waypoint_lists.size() > 1) // Only take off if we're not at the last waypoint and mission end is to autoland
                     {
@@ -855,6 +904,14 @@ void FlightPlanner::onWaypointReached()
                     ROS_INFO("in landing loop");
                     ROS_INFO("Sleep time is %f", sampleTime);
                     ros::Duration(sampleTime).sleep();
+
+                    // // send command to stop recording
+                    //  daq_data[0] = 0x33;
+                    //  daq_data[1] = 0x33;
+                    //  daq_data[2] = 0x0;
+                    //  daq_data[3] = 0x0;
+                    //  daq_data[4] = 0x0;
+                    //  daq_data[5] = 0x0; 
                     ROS_INFO("Drone Exited Sleeep");
                     verti_control = 1;
                     flightControl.monitoredTakeoff();

@@ -4,6 +4,8 @@
 #include "m100_flight_planner/PID.h"
 #include "m100_flight_planner/flight_base.h"
 #include "m100_flight_planner/flight_control.h"
+#include <std_msgs/Float32MultiArray.h>
+#include <serial/serial.h>
 
 #include <queue>
 #include <Eigen/Geometry>
@@ -146,6 +148,11 @@ private:
                                           DJISDK::STABLE_ENABLE);
 
     ros::Publisher control_publisher;
+
+
+    //Serial Object
+    //serial::Serial ser_object;
+    //uint8_t daq_data[6];
 };
 
 #endif // FLIGHT_PLANNER_H
