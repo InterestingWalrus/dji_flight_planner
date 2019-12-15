@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   dji_sdk
   nav_msgs
   roscpp
+  serial
   rospy
   std_msgs
   sensor_msgs
@@ -24,6 +25,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
    INCLUDE_DIRS include
   CATKIN_DEPENDS
+        serial
         geometry_msgs
         nav_msgs
         std_msgs

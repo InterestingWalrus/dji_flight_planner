@@ -36,6 +36,7 @@ public:
     ~FlightPlanner();
     void setWaypoint(sensor_msgs::NavSatFix newWaypoint);
     void step();
+    void horizontalControl();
     void stepHome();
     void stepYaw();
     void getLocalPositionOffset(geometry_msgs::Vector3 &deltaENU, sensor_msgs::NavSatFix &target, sensor_msgs::NavSatFix &origin);
@@ -51,6 +52,7 @@ public:
     void keyboardControl();
     void setZOffset(double offset);
     Eigen::Vector3d getEffort(Eigen::Vector3d &target);
+    Eigen::Vector2d getHorizontalEffort(Eigen::Vector2d &target);
     Eigen::Vector3d getHomeEffort(Eigen::Vector3d &target);
     Eigen::Vector3d setTarget(float x, float y, float z);
     Eigen::Vector3d setHomeTarget(float x, float y, float z);
@@ -76,8 +78,10 @@ private:
     double z_offset_takeoff;
     float yaw_limit;
     float distance_to_setpoint;
+    float xy_setpoint_dist;
     float home_distance;
     bool drone_version; // return drone version.
+    int ctrl_flag;
 
     // get data from the android device
     dji_sdk::MobileData data_from_mobile;
@@ -151,8 +155,8 @@ private:
 
 
     //Serial Object
-    //serial::Serial ser_object;
-    //uint8_t daq_data[6];
+    serial::Serial ser_object;
+    uint8_t daq_data[6];
 };
 
 #endif // FLIGHT_PLANNER_H

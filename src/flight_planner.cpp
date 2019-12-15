@@ -5,9 +5,6 @@ float kp;
 float ki;
 float kd;
 
-int inbound_counter;
-int outbound_counter;
-int break_counter;
 
 char getch()
 {
@@ -89,11 +86,11 @@ FlightPlanner::FlightPlanner()
     try
     {
     
-       // ser_object.setPort("/dev/ttyACMO");
-       // ser_object.setBaudrate(115200);
-       // serial::Timeout to = serial::Timeout::simpleTimeout(1000);
-      //  ser_object.setTimeout(to);
-       // ser_object.open();
+       ser_object.setPort("/dev/ttyACMO");
+       ser_object.setBaudrate(115200);
+       serial::Timeout to = serial::Timeout::simpleTimeout(1000);
+       ser_object.setTimeout(to);
+       ser_object.open();
 
     }
     catch(const std::exception& e)
@@ -101,16 +98,16 @@ FlightPlanner::FlightPlanner()
          ROS_ERROR("Unable to open Serial Port");
     }
 
-    // if(ser_object.isOpen())
-    // {
-    //     ROS_INFO("Serial Port Initialised");
-    // }
+    if(ser_object.isOpen())
+    {
+        ROS_INFO("Serial Port Initialised");
+    }
 
-    // else
-    // {
-    //       ROS_ERROR("Serial Port not Initialised");
+    else
+    {
+          ROS_ERROR("Serial Port not Initialised");
 
-    // }
+    }
 
     //TODO Use param server to change gains.
     yaw_limit = DegToRad(180);
@@ -134,6 +131,7 @@ FlightPlanner::FlightPlanner()
     missionEnd = 0;
     hover_flag = 0;
     verti_control = 1;
+    ctrl_flag = 0;
 }
 
 void FlightPlanner::stepHome()
@@ -166,7 +164,7 @@ void FlightPlanner::stepHome()
     y_cmd = pid_effort * cmd_vector[1];
     z_cmd = pid_effort * cmd_vector[2];
 
-    if (home_z_offset_left > 0.2)
+    if (home_z_offset_left > 1)
     {
         droneControlSignal(0, 0, z_cmd, 0);
     }
@@ -193,6 +191,94 @@ void FlightPlanner::stepHome()
         home_reached = true;
     }
 }
+
+void FlightPlanner::horizontalControl()
+{
+    geometry_msgs::Vector3 position_offset;
+
+    // Compute the local position delta from the current waypoint to the next waypoint
+    getLocalPositionOffset(position_offset, current_gps_location, start_gps_location);
+
+    double x_offset_left = target_position_vector[0] - position_offset.x;
+    double y_offset_left = target_position_vector[1] - position_offset.y;
+    double z_offset_left = target_position_vector[2] - position_offset.z;
+
+    Eigen::Vector2d xy_effort;
+
+    xy_effort << x_offset_left, y_offset_left;
+
+    // To be used to set velocities on the UAV
+    Eigen::Vector2d cmd_vector;
+
+    cmd_vector = getHorizontalEffort(xy_effort);
+    // commands to be sent to control publisher
+
+    double pid_effort = pid_pos.PIDupdate(xy_setpoint_dist);
+    double x_cmd, y_cmd, z_cmd;
+
+    x_cmd = pid_effort * cmd_vector[0];
+    y_cmd = pid_effort * cmd_vector[1];
+
+    if (abs(z_cmd) >= speedFactor)
+    {
+         z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
+    }
+    else
+    {
+         z_cmd = z_offset_left;
+    }
+    // Wait for UAV to gain required altitude
+    if (verti_control == 1 && z_offset_left > 0.1)
+    {
+        ROS_INFO("SPeed: %f", speedFactor);
+        ROS_INFO("Enter Z offset %f", z_cmd);
+        droneControlSignal(0, 0, z_cmd, 0);
+    }
+
+    // send X,Y command to UAV
+    else
+    {
+        verti_control = 0;
+        droneControlSignal(x_cmd, y_cmd, 0, 0);
+    }
+
+    // ROS_INFO("PID_Effort: %f", pid_effort);
+    // ROS_INFO("Setpoint distance: %f", xy_setpoint_dist);
+
+    // If we are close, start braking
+    if (xy_setpoint_dist < 0.5)
+    {
+        droneControlSignal(0, 0, 0, 0);
+        ROS_INFO("Setpoint");
+        waypoint_finished = true;
+    }
+
+    // To play or pause mission
+    if (hover_flag == true)
+    {
+        ROS_INFO("Hover Flag");
+        droneControlSignal(0, 0, 0, 0);
+    }
+}
+
+Eigen::Vector2d FlightPlanner::getHorizontalEffort(Eigen::Vector2d &target)
+{
+     double vector_length = target.norm();
+     xy_setpoint_dist = vector_length;
+
+    // Initialise unit vector
+    Eigen::Vector2d position_unit_vector = Eigen::Vector2d::Zero();
+    // check for zero magnitude
+    if (vector_length != 0)
+    {
+        // normalize vector;
+        position_unit_vector = target.normalized();
+    }
+
+    return position_unit_vector;
+
+}
+
 
 void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr &mobile_data)
 {
@@ -468,15 +554,8 @@ void FlightPlanner::step()
     double x_cmd, y_cmd, z_cmd;
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
-    //z_cmd = pid_effort * cmd_vector[2];
-     if (abs(z_cmd) >= speedFactor)
-     {
-     z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
-     }
-   else
-   {
-     z_cmd = z_offset_left;
-   }
+    z_cmd = pid_effort * cmd_vector[2];
+    
     // Wait for UAV to gain required altitude
     if (verti_control == 1 && z_offset_left > 0.1)
     {
@@ -864,25 +943,25 @@ void FlightPlanner::onWaypointReached()
                 // TODO iintegrate UART_START_DMA Here.
                 //unsigned char record_time[sizeof(sampleTime)];
                 // Send command to record data here
-                //daq_data[0] = 0x35;
-                //daq_data[1] = 0x4D;
+                daq_data[0] = 0x35;
+                daq_data[1] = 0x4D;
                 // cast sample time to an integer here.
-                //memcpy(&daq_data[2], &sampleTime, sizeof(float));
-                //ser_object.write(daq_data, 6);
+                memcpy(&daq_data[2], &sampleTime, sizeof(float));
+                ser_object.write(daq_data, 6);
 
                 if (drone_version)
                 {                   
                     ROS_INFO("Sleep time is %f", sampleTime);
                     ros::Duration(sampleTime).sleep();
 
-                    //  daq_data[0] = 0x33;
-                    //  daq_data[1] = 0x33;
-                    //  daq_data[2] = 0x0;
-                    //  daq_data[3] = 0x0;
-                    //  daq_data[4] = 0x0;
-                    //  daq_data[5] = 0x0; 
-                    //  // Send command to stop recording.
-                    // ser_object.write(daq_data, 6);
+                     daq_data[0] = 0x33;
+                     daq_data[1] = 0x33;
+                     daq_data[2] = 0x0;
+                     daq_data[3] = 0x0;
+                     daq_data[4] = 0x0;
+                     daq_data[5] = 0x0; 
+                      // Send command to stop recording.
+                     ser_object.write(daq_data, 6);
 
 
 
@@ -998,7 +1077,17 @@ void FlightPlanner::runMission()
 
             if (!yaw_flag)
             {
-                step();
+                if(ctrl_flag == 0)
+                {
+                     step();
+                }
+
+                else
+                {
+                    horizontalControl();
+                }
+                
+               
             }
         }
 
