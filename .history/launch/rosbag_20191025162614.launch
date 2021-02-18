@@ -1,6 +1,0 @@
-<launch>
-
-  <node pkg = "rosbag" type="record" name="dji_rosbag" output="screen"
-   args="-o /home/rosboxone/phocoena_ws/src /diagnostics /rosout" />
-
-</launch>

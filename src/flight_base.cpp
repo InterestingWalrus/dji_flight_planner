@@ -18,7 +18,7 @@ FlightBase::FlightBase()
     local_position_subscriber = nh.subscribe("/dji_sdk/local_position", 10, &FlightBase::localPositionCallback, this);
    // local_position_subscriber = nh.subscribe("odometry/filtered", 10, &FlightBase::ekf_odometry_callback, this); // For EKF control testing
     attitude_subscriber = nh.subscribe("/dji_sdk/attitude", 10, &FlightBase::attitudeCallback, this);
-
+   // angle_publisher = nh.advertise<geometry_msgs::QuaternionStamped>("dji_sdk/Yaw", 10);
 
    // SET Which GPS topic to subscribe to based on which drone is being used..
    // Currently can't use the same subscriber as /dji_sdk/fused_gps isn't a NAVSATFIX Type 

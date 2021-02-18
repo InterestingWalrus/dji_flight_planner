@@ -1,9 +1,14 @@
 <?xml version="1.0"?>
 <launch>
 
+      <node pkg = "rosbag" type="record" name="dji_rosbag" output="screen"
+   args="-a -o /home/rosboxone/phocoena_ws"/>
+
     <!--Mission Control -->
         <node name = "djiflight" pkg = "dji_flight_planner"
-          type="m100_flight_planner" output = "screen">
+          type="m100_flight_planner" output = "log">
     </node>
+
+
 
 </launch>

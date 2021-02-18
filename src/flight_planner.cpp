@@ -1,10 +1,8 @@
 #include "m100_flight_planner/flight_planner.h"
 
-Pid_control pid_pos, pid_yaw;
-float kp;
-float ki;
-float kd;
-
+int inbound_counter;
+int outbound_counter;
+int break_counter;
 
 char getch()
 {
@@ -69,6 +67,8 @@ FlightPlanner::FlightPlanner()
 
     control_publisher = nh.advertise<sensor_msgs::Joy>("dji_sdk/flight_control_setpoint_generic", 10);
 
+    error_publisher = nh.advertise<std_msgs::Float32>("dji_sdk/landing_error", 10);
+
     mobile_data_subscriber = nh.subscribe<dji_sdk::MobileData>("dji_sdk/from_mobile_data", 10, &FlightPlanner::mobileDataSubscriberCallback, this);
 
     ROS_INFO("In control loop");
@@ -81,32 +81,6 @@ FlightPlanner::FlightPlanner()
         {
             ROS_INFO("Local Position set successfully! ");
         }
-    }
-
-    try
-    {
-    
-       ser_object.setPort("/dev/ttyACMO");
-       ser_object.setBaudrate(115200);
-       serial::Timeout to = serial::Timeout::simpleTimeout(1000);
-       ser_object.setTimeout(to);
-       ser_object.open();
-
-    }
-    catch(const std::exception& e)
-    {
-         ROS_ERROR("Unable to open Serial Port");
-    }
-
-    if(ser_object.isOpen())
-    {
-        ROS_INFO("Serial Port Initialised");
-    }
-
-    else
-    {
-          ROS_ERROR("Serial Port not Initialised");
-
     }
 
     //TODO Use param server to change gains.
@@ -131,7 +105,18 @@ FlightPlanner::FlightPlanner()
     missionEnd = 0;
     hover_flag = 0;
     verti_control = 1;
-    ctrl_flag = 0;
+
+    ki = 0;
+    kp = 0.5;
+    kd = 0;
+
+    kp_z = 0.8;
+    ki_z = 0;
+    kd_z = 0.001;
+
+    kp_y = 1.2;
+    ki_y = 0;
+    kd_y = 0.001;
 }
 
 void FlightPlanner::stepHome()
@@ -151,12 +136,13 @@ void FlightPlanner::stepHome()
 
     Eigen::Vector3d effort;
     effort << home_x_offset_left, home_y_offset_left, home_z_offset_left;
-    ROS_INFO("STEP offset LEFT  x: %f y: %f z: %f ", home_x_offset_left, home_y_offset_left, home_z_offset_left);
+    // ROS_INFO("STEP offset LEFT  x: %f y: %f z: %f ", home_x_offset_left, home_y_offset_left, home_z_offset_left);
 
     Eigen::Vector3d cmd_vector;
     cmd_vector = getHomeEffort(effort);
+    double temp_val = home_target_norm - home_distance;
 
-    double pid_effort = pid_pos.PIDupdate(home_distance);
+    double pid_effort = pid_pos.update(home_target_norm, temp_val, dt);
 
     double x_cmd, y_cmd, z_cmd;
 
@@ -180,7 +166,7 @@ void FlightPlanner::stepHome()
         droneControlSignal(0, 0, 0, 0);
     }
 
-    ROS_INFO("Distance to Home setpoint: %f", home_distance);
+    //ROS_INFO("Distance to Home setpoint: %f", home_distance);
 
     //TODO: Fix this and fix overshhot on RTH. Update to 3.9 and use FC class to set RTH
     if (home_distance <= 2)
@@ -191,94 +177,6 @@ void FlightPlanner::stepHome()
         home_reached = true;
     }
 }
-
-void FlightPlanner::horizontalControl()
-{
-    geometry_msgs::Vector3 position_offset;
-
-    // Compute the local position delta from the current waypoint to the next waypoint
-    getLocalPositionOffset(position_offset, current_gps_location, start_gps_location);
-
-    double x_offset_left = target_position_vector[0] - position_offset.x;
-    double y_offset_left = target_position_vector[1] - position_offset.y;
-    double z_offset_left = target_position_vector[2] - position_offset.z;
-
-    Eigen::Vector2d xy_effort;
-
-    xy_effort << x_offset_left, y_offset_left;
-
-    // To be used to set velocities on the UAV
-    Eigen::Vector2d cmd_vector;
-
-    cmd_vector = getHorizontalEffort(xy_effort);
-    // commands to be sent to control publisher
-
-    double pid_effort = pid_pos.PIDupdate(xy_setpoint_dist);
-    double x_cmd, y_cmd, z_cmd;
-
-    x_cmd = pid_effort * cmd_vector[0];
-    y_cmd = pid_effort * cmd_vector[1];
-
-    if (abs(z_cmd) >= speedFactor)
-    {
-         z_cmd = (z_cmd>0) ? speedFactor : -1 * speedFactor;
-    }
-    else
-    {
-         z_cmd = z_offset_left;
-    }
-    // Wait for UAV to gain required altitude
-    if (verti_control == 1 && z_offset_left > 0.1)
-    {
-        ROS_INFO("SPeed: %f", speedFactor);
-        ROS_INFO("Enter Z offset %f", z_cmd);
-        droneControlSignal(0, 0, z_cmd, 0);
-    }
-
-    // send X,Y command to UAV
-    else
-    {
-        verti_control = 0;
-        droneControlSignal(x_cmd, y_cmd, 0, 0);
-    }
-
-    // ROS_INFO("PID_Effort: %f", pid_effort);
-    // ROS_INFO("Setpoint distance: %f", xy_setpoint_dist);
-
-    // If we are close, start braking
-    if (xy_setpoint_dist < 0.5)
-    {
-        droneControlSignal(0, 0, 0, 0);
-        ROS_INFO("Setpoint");
-        waypoint_finished = true;
-    }
-
-    // To play or pause mission
-    if (hover_flag == true)
-    {
-        ROS_INFO("Hover Flag");
-        droneControlSignal(0, 0, 0, 0);
-    }
-}
-
-Eigen::Vector2d FlightPlanner::getHorizontalEffort(Eigen::Vector2d &target)
-{
-     double vector_length = target.norm();
-     xy_setpoint_dist = vector_length;
-
-    // Initialise unit vector
-    Eigen::Vector2d position_unit_vector = Eigen::Vector2d::Zero();
-    // check for zero magnitude
-    if (vector_length != 0)
-    {
-        // normalize vector;
-        position_unit_vector = target.normalized();
-    }
-
-    return position_unit_vector;
-
-}
-
 
 void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr &mobile_data)
 {
@@ -474,14 +372,34 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             // Initialise PID
             //TODO: Set different gains for both drones
             ROS_INFO("Speed Factor %f", speedFactor);
-            pid_pos.PIDinit(1.5, 0, 0.05, speedFactor, -speedFactor);
-            pid_yaw.PIDinit(1, 0, 0, yaw_limit, -yaw_limit);
 
-            // set first gps position
-            if (drone_version)
+            if (speedFactor < z_max)
             {
-                setZOffset(current_local_position.z);
+                z_clamp_p = speedFactor;
             }
+
+            else
+            {
+                z_clamp_p = z_max;
+            }
+
+            if (z_min > -speedFactor)
+            {
+                z_clamp_n = z_min;
+            }
+
+            else
+            {
+                z_clamp_n = -speedFactor;
+            }
+            pid_pos.init(kp, ki, kd, speedFactor, -speedFactor);
+            pid_z.init(kp_z, ki_z, kd_z, 5, z_clamp_n);
+            pid_yaw.init(kp_y, ki_y, kd_y, speedFactor, -speedFactor);
+            // set first gps position
+            // if (drone_version)
+            // {
+            //     setZOffset(current_local_position.z);
+            // }
 
             start_gps_location = current_gps_location;
             start_local_position = current_local_position;
@@ -489,19 +407,18 @@ void FlightPlanner::mobileDataSubscriberCallback(const dji_sdk::MobileData::Cons
             //Wait for Keyboard Press
             ROS_INFO("Initiating mission Press C on your keyboard to start mission: ");
 
-           std::cin.clear();
-           std::cin >> command;
-           std::cout << "command: " << command << std::endl;
+            // std::cin.clear();
+            // std::cin >> command;
+            // std::cout << "command: " << command << std::endl;
 
             //Start Mission
-            while (ros::ok() && command == "c")
+            // while (ros::ok() && command == "c")
+            while (ros::ok())
             {
                 ros::spinOnce();
                 runMission();
                 loop_rate.sleep();
             }
-
-        
         }
 
         break;
@@ -524,6 +441,21 @@ FlightPlanner::~FlightPlanner()
 {
 }
 
+Eigen::Vector2d FlightPlanner::getHorizontalEffort(Eigen::Vector2d &target)
+{
+    double vector_length = target.norm();
+    xy_setpoint_dist = vector_length;
+
+    Eigen::Vector2d position_unit_vector = Eigen::Vector2d::Zero();
+
+    if (vector_length != 0)
+    {
+        position_unit_vector = target.normalized();
+    }
+
+    return position_unit_vector;
+}
+
 void FlightPlanner::step()
 {
     geometry_msgs::Vector3 position_offset;
@@ -533,60 +465,45 @@ void FlightPlanner::step()
 
     double x_offset_left = target_position_vector[0] - position_offset.x;
     double y_offset_left = target_position_vector[1] - position_offset.y;
-    double z_offset_left = target_position_vector[2] - position_offset.z;
+    double z_offset_left = target_position_vector[2] - position_offset.z - z_offset_takeoff;
+    ;
 
-    //ROS_INFO("Z_offset_left: %f", z_offset_left );
-    //ROS_INFO("y offset_left: %f", y_offset_left );
-    //ROS_INFO("x_offset_left: %f", x_offset_left );
-    Eigen::Vector3d effort;
+    Eigen::Vector2d xy_effort;
+    xy_effort << x_offset_left, y_offset_left;
+    Eigen::Vector2d cmd_vector;
+    cmd_vector = getHorizontalEffort(xy_effort);
 
-    effort << x_offset_left, y_offset_left, z_offset_left;
+    double temp_val = hori_target_norm - xy_setpoint_dist;
+    double pid_effort = pid_pos.update(hori_target_norm, temp_val, dt);
 
-    // To be used to set velocities on the UAV
-    Eigen::Vector3d cmd_vector;
+    double z_pid_effort = pid_z.update(target_position_vector[2], current_local_position.z, dt);
 
-    cmd_vector = getEffort(effort);
-
-    // Determine the UAV speed
-    double pid_effort = pid_pos.PIDupdate(distance_to_setpoint);
-
-    // commands to be sent to control publisher
     double x_cmd, y_cmd, z_cmd;
     x_cmd = pid_effort * cmd_vector[0];
     y_cmd = pid_effort * cmd_vector[1];
-    z_cmd = pid_effort * cmd_vector[2];
-    
+    z_cmd = z_pid_effort;
+
     // Wait for UAV to gain required altitude
     if (verti_control == 1 && z_offset_left > 0.1)
     {
-        ROS_INFO("SPeed: %f", speedFactor);
-        ROS_INFO("Enter Z offset %f", z_cmd);
+        //ROS_INFO("Z Offset: %f", z_offset_left);
         droneControlSignal(0, 0, z_cmd, 0);
+        //  ROS_INFO("Target: %f", target_position_vector[2]);
+        //  ROS_INFO("Current: %f", current_local_position.z);
+        //  ROS_INFO("Effort: %f", z_pid_effort);
     }
 
-    // send X,Y command to UAV
     else
     {
         verti_control = 0;
         droneControlSignal(x_cmd, y_cmd, 0, 0);
     }
 
-    // ROS_INFO("PID_Effort: %f", pid_effort);
-    // ROS_INFO("Setpoint distance: %f", distance_to_setpoint);
-
-    // If we are close, start braking
-    if (distance_to_setpoint < 0.5)
+    if (xy_setpoint_dist < 0.5)
     {
         droneControlSignal(0, 0, 0, 0);
         ROS_INFO("Setpoint");
         waypoint_finished = true;
-    }
-
-    // To play or pause mission
-    if (hover_flag == true)
-    {
-        ROS_INFO("Hover Flag");
-        droneControlSignal(0, 0, 0, 0);
     }
 }
 
@@ -610,17 +527,17 @@ void FlightPlanner::stepYaw()
     double yaw_diff = desired_yaw_angle - current_yaw_angle;
 
     // Yaw pid to be published to control signal.
-    double yaw_pid = pid_yaw.PIDupdate(yaw_diff);
+    double yaw_pid = pid_yaw.update(desired_yaw_angle, current_yaw_angle, dt);
 
     double desired_yaw_angle_deg = RadToDeg(desired_yaw_angle);
 
     double current_yaw_deg = RadToDeg(current_yaw_angle);
 
-    ROS_INFO("Desired angle degree= %f", desired_yaw_angle_deg);
+    //ROS_INFO("Desired angle degree= %f", desired_yaw_angle_deg);
 
-    ROS_INFO("Current Yaw Angle %f", current_yaw_deg);
+    // ROS_INFO("Current Yaw Angle %f", current_yaw_deg);
 
-    ROS_INFO("Yaw PID %f", yaw_pid);
+    // ROS_INFO("Yaw PID %f", yaw_pid);
 
     // Use Yaw angle flag for the control publisher
     droneControlSignal(0, 0, 0, yaw_pid, true, true);
@@ -628,6 +545,7 @@ void FlightPlanner::stepYaw()
     if (fabs(desired_yaw_angle_deg - current_yaw_deg) < 0.9)
     {
         yaw_flag = false;
+        ROS_INFO("YAW");
     }
 }
 
@@ -643,21 +561,21 @@ Eigen::Vector3d FlightPlanner::setTarget(float x, float y, float z)
     ROS_INFO("Target set as %f, %f, %f", x, y, z);
     target_position_vector << x, y, z;
 
+    Eigen::Vector2d xy_pos_vec;
+    xy_pos_vec << x, y;
+
+    hori_target_norm = xy_pos_vec.norm();
+    target_norm = target_position_vector.norm();
+
     return target_position_vector;
 }
 
 Eigen::Vector3d FlightPlanner::setHomeTarget(float x, float y, float z)
 {
-    ROS_INFO("Home point set as %f, %f, %f", x, y, z);
-
-    //TODO:: More tests of offsetting z axis on M100
-    // if(drone_version)  // if drone is M100
-    // {
-    //   z = z + z_offset_takeoff;
-    //   ROS_INFO("Removed Z Offset");
-    // }
-
+    //ROS_INFO("Home point set as %f, %f, %f", x, y, z);
     home_position_vector << x, y, z;
+
+    home_target_norm = home_position_vector.norm();
 
     return home_position_vector;
 }
@@ -941,29 +859,14 @@ void FlightPlanner::onWaypointReached()
                 // Pause for a period of time here...
                 // Integrate whatever task we're doing at this point.
                 // TODO iintegrate UART_START_DMA Here.
-                //unsigned char record_time[sizeof(sampleTime)];
-                // Send command to record data here
-                daq_data[0] = 0x35;
-                daq_data[1] = 0x4D;
-                // cast sample time to an integer here.
-                memcpy(&daq_data[2], &sampleTime, sizeof(float));
-                ser_object.write(daq_data, 6);
 
                 if (drone_version)
-                {                   
+                {
                     ROS_INFO("Sleep time is %f", sampleTime);
+                    ROS_INFO("UAV landed at  Lat: %f, Lon: %f", current_gps_location.latitude, current_gps_location.longitude);
+                    ROS_INFO("Intended Landing area is: Lat: %f, Lon: %f", flight_plan[waypoint_index].latitude, flight_plan[waypoint_index].longitude);
+                    getPositionError(current_gps_location, flight_plan[waypoint_index]);
                     ros::Duration(sampleTime).sleep();
-
-                     daq_data[0] = 0x33;
-                     daq_data[1] = 0x33;
-                     daq_data[2] = 0x0;
-                     daq_data[3] = 0x0;
-                     daq_data[4] = 0x0;
-                     daq_data[5] = 0x0; 
-                      // Send command to stop recording.
-                     ser_object.write(daq_data, 6);
-
-
 
                     if (waypoint_lists.size() > 1) // Only take off if we're not at the last waypoint and mission end is to autoland
                     {
@@ -983,14 +886,6 @@ void FlightPlanner::onWaypointReached()
                     ROS_INFO("in landing loop");
                     ROS_INFO("Sleep time is %f", sampleTime);
                     ros::Duration(sampleTime).sleep();
-
-                    // // send command to stop recording
-                    //  daq_data[0] = 0x33;
-                    //  daq_data[1] = 0x33;
-                    //  daq_data[2] = 0x0;
-                    //  daq_data[3] = 0x0;
-                    //  daq_data[4] = 0x0;
-                    //  daq_data[5] = 0x0; 
                     ROS_INFO("Drone Exited Sleeep");
                     verti_control = 1;
                     flightControl.monitoredTakeoff();
@@ -1030,7 +925,31 @@ void FlightPlanner::getLocalPositionOffset(geometry_msgs::Vector3 &deltaENU, sen
 
     deltaENU.y = DegToRad(deltaLat) * C_EARTH;
     deltaENU.x = DegToRad(deltaLon) * C_EARTH * cos(DegToRad(target.latitude));
-    deltaENU.z = target.altitude - origin.altitude;
+    //deltaENU.z = target.altitude - origin.altitude;
+    deltaENU.z = target.altitude;
+}
+
+double FlightPlanner::getPositionError(sensor_msgs::NavSatFix &start_coord, sensor_msgs::NavSatFix &end_coord)
+{
+    double lat1_rad = DegToRad(start_coord.latitude);
+    double lat2_rad = DegToRad(end_coord.latitude);
+    double delta_lat_deg = end_coord.latitude - start_coord.latitude;
+    double delta_lat = DegToRad(delta_lat_deg);
+    double delta_lon_deg = end_coord.longitude - start_coord.longitude;
+    double delta_lon = DegToRad(delta_lon_deg);
+    double a = sin(delta_lat / 2) * sin(delta_lat / 2) + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon / 2) * sin(delta_lon / 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double d = C_EARTH * c;
+
+    total_landing_error += d;
+
+    ROS_INFO("Landing Error %f", d);
+    std_msgs::Float32 error_msg;
+    error_msg.data = d;
+
+    error_publisher.publish(error_msg);
+
+    return d;
 }
 
 void FlightPlanner::runMission()
@@ -1039,9 +958,9 @@ void FlightPlanner::runMission()
     {
     case MissionState::IDLE:
     {
-        //TODO Fix waypoint mission from idle bug. 
+        //TODO Fix waypoint mission from idle bug.
         //Probably just need to call setLocalPosition() again
-        if (waypoint_count != 0) 
+        if (waypoint_count != 0)
         {
 
             waypoint_finished = false;
@@ -1077,17 +996,7 @@ void FlightPlanner::runMission()
 
             if (!yaw_flag)
             {
-                if(ctrl_flag == 0)
-                {
-                     step();
-                }
-
-                else
-                {
-                    horizontalControl();
-                }
-                
-               
+                step();
             }
         }
 
@@ -1126,7 +1035,7 @@ void FlightPlanner::runMission()
     {
         ros::Duration(0.1).sleep();
 
-        ROS_INFO("Drone is case %d", checkMissionEnd);
+        //ROS_INFO("Drone is case %d", checkMissionEnd);
 
         switch (checkMissionEnd)
         {
@@ -1161,7 +1070,10 @@ void FlightPlanner::runMission()
                 stepHome();
             }
 
-            ROS_INFO("Home reached %d", home_reached);
+            //ROS_INFO("Home reached %d", home_reached);
+
+            // Average landing error here:
+            computeLandingError();
 
             break;
         }
@@ -1181,9 +1093,18 @@ void FlightPlanner::runMission()
     }
 }
 
+void FlightPlanner::computeLandingError()
+{
+    ROS_INFO("Number of waypoints is %d", waypoint_count);
+    ROS_INFO("Total landing error is %f", total_landing_error);
+    double avg_error = total_landing_error / waypoint_count;
+
+    ROS_INFO("Average landing error for mission at %f m/s speed is %f", speedFactor, avg_error);
+}
+
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "Flight Control");
+    ros::init(argc, argv, "Flight_Control");
 
     FlightPlanner flight_planner;
 

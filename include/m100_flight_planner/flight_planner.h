@@ -1,11 +1,23 @@
 #ifndef FLIGHT_PLANNER_H
 #define FLIGHT_PLANNER_H
 
+#define PID_KP  2.0f
+#define PID_KI  0.5f
+#define PID_KD  0.25f
+
+#define PID_TAU 0.04f
+
+#define PID_LIM_MIN -10.0f
+#define PID_LIM_MAX  10.0f
+
+#define PID_LIM_MIN_INT -5.0f
+#define PID_LIM_MAX_INT  5.0f
+
+#define SAMPLE_TIME_S 0.02f
+
 #include "m100_flight_planner/PID.h"
 #include "m100_flight_planner/flight_base.h"
 #include "m100_flight_planner/flight_control.h"
-#include <std_msgs/Float32MultiArray.h>
-#include <serial/serial.h>
 
 #include <queue>
 #include <Eigen/Geometry>
@@ -36,7 +48,6 @@ public:
     ~FlightPlanner();
     void setWaypoint(sensor_msgs::NavSatFix newWaypoint);
     void step();
-    void horizontalControl();
     void stepHome();
     void stepYaw();
     void getLocalPositionOffset(geometry_msgs::Vector3 &deltaENU, sensor_msgs::NavSatFix &target, sensor_msgs::NavSatFix &origin);
@@ -52,13 +63,15 @@ public:
     void keyboardControl();
     void setZOffset(double offset);
     Eigen::Vector3d getEffort(Eigen::Vector3d &target);
-    Eigen::Vector2d getHorizontalEffort(Eigen::Vector2d &target);
     Eigen::Vector3d getHomeEffort(Eigen::Vector3d &target);
     Eigen::Vector3d setTarget(float x, float y, float z);
     Eigen::Vector3d setHomeTarget(float x, float y, float z);
     float setYaw(float yaw);
     void flightAnomalyCallback(const dji_sdk::FlightAnomaly::ConstPtr &msg);
     void mobileDataSubscriberCallback(const dji_sdk::MobileData::ConstPtr &mobile_data);
+    Eigen::Vector2d getHorizontalEffort(Eigen::Vector2d &target);
+    double getPositionError(sensor_msgs::NavSatFix &origin, sensor_msgs::NavSatFix &target);
+    void computeLandingError();
 
 private:
     MobileComm mobileCommManager;
@@ -78,10 +91,23 @@ private:
     double z_offset_takeoff;
     float yaw_limit;
     float distance_to_setpoint;
-    float xy_setpoint_dist;
     float home_distance;
+    float home_target_norm;
     bool drone_version; // return drone version.
-    int ctrl_flag;
+    float kp, ki, kd;
+    float kp_z, ki_z, kd_z;
+    float kp_y, ki_y, kd_y;
+    float xy_setpoint_dist;
+    float z_max = 5;
+    float z_min = -4;
+    float z_clamp_p;
+    float z_clamp_n;
+    float hori_target_norm;
+    float target_norm;
+    double total_landing_error;
+
+
+
 
     // get data from the android device
     dji_sdk::MobileData data_from_mobile;
@@ -152,11 +178,13 @@ private:
                                           DJISDK::STABLE_ENABLE);
 
     ros::Publisher control_publisher;
+    
+    ros::Publisher error_publisher;
 
 
-    //Serial Object
-    serial::Serial ser_object;
-    uint8_t daq_data[6];
+    PIDController pid_pos;
+    PIDController pid_z;
+    PIDController pid_yaw;
 };
 
 #endif // FLIGHT_PLANNER_H

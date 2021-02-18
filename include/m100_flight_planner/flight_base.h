@@ -58,6 +58,8 @@ protected:
     ros::Subscriber mobile_data_subscriber;
     ros::Subscriber velocity_subscriber;
 
+   // ros::Publisher angle_publisher;
+
     geometry_msgs::Vector3Stamped velocity_data;
     geometry_msgs::Point current_local_position;
     sensor_msgs::NavSatFix current_gps_location;

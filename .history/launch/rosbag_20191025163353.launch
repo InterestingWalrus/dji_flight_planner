@@ -1,6 +1,0 @@
-<launch>
-
-  <node pkg = "rosbag" type="record" name="dji_rosbag" output="screen"
-   args="-o /home/rosboxone/bags/ --all" />
-
-</launch>

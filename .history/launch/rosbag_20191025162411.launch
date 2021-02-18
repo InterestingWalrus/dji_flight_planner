@@ -1,8 +1,0 @@
-<launch>
-
-  <arg name ="mypkg" default="dji_flight_planner"/>
-
-  <node pkg = "rosbag" type="record" name="dji_rosbag" output="screen"
-   args="-o ~/phocoena_ws/src/dji_flight_planner/bags" />
-
-</launch>

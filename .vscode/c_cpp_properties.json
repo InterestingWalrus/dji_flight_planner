@@ -7,7 +7,7 @@
             },
             "includePath": [
                 "~/phocoena_ws/devel/include",
-                "/opt/ros/kinetic/include",
+                "/opt/ros/melodic/include",
                 "~/phocoena_ws/src/Onboard-SDK-ROS/dji_sdk/include",
                 "/usr/include",
                 "${workspaceFolder}/include",

@@ -1,4 +1,0 @@
-<launch>
-  <node pkg = "rosbag" type="record" name="dji_rosbag"  args="record -a -o ~/bags" />
-
-</launch>

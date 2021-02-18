@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <node pkg = "rosbag" type="record" name="dji_rosbag"  output="screen" args="--all" />
-
-</launch>
