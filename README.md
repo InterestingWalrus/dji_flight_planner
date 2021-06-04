@@ -5,7 +5,7 @@ A ROS Package for flight planning on the DJI Matrice M100.
 ## Prerequisites
 - DJI M100
 - An Android Device > V4.4
-- ROS with [DJI Onboard SDK v3.80] (https://github.com/dji-sdk/Onboard-SDK-ROS/tree/3.8)
+- ROS with [DJI Onboard SDK v3.80](https://github.com/dji-sdk/Onboard-SDK-ROS/tree/3.8)
 - Tested with ROS 1 Kinetic and Melodic.
 
 ## Usage
