@@ -1,6 +1,6 @@
 # DJI M100 SDK Flight Planner
 
-A ROS Package for flight planning on the DJI Matrice M100. 
+A ROS Package for flight planning on the DJI Matrice M100.  Example video can be found [here](https://www.youtube.com/watch?v=XvGR7AQk8zw)
 
 ## Prerequisites
 - DJI M100
